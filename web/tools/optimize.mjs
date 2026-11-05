@@ -83,3 +83,17 @@ for (const [name, info] of Object.entries(manifest)) {
 }
 fs.writeFileSync(path.join(LM_OUT, "manifest.json"), JSON.stringify(manifest, null, 2));
 console.log("lightmaps", (before / 1e6).toFixed(2), "MB ->", (after / 1e6).toFixed(2), "MB");
+
+// ---- painting normal maps (bake_art_normals.py): plain PNG -> WebP, loaded by main.js only when Glare is switched on ----
+const NORMALS_IN = path.join(root, "build/normals");
+if (fs.existsSync(NORMALS_IN)) {
+  const NORMALS_OUT = path.join(OUT, "normals");
+  fs.mkdirSync(NORMALS_OUT, { recursive: true });
+  let nb = 0, na = 0;
+  for (const f of fs.readdirSync(NORMALS_IN).filter((f) => f.endsWith(".png"))) {
+    const dst = path.join(NORMALS_OUT, f.replace(/\.png$/, ".webp"));
+    await sharp(path.join(NORMALS_IN, f)).webp({ quality: 90 }).toFile(dst);   // 90 like the other normal maps; lower shows blocks in the flat areas
+    nb += fs.statSync(path.join(NORMALS_IN, f)).size; na += fs.statSync(dst).size;
+  }
+  console.log("normals", (nb / 1e6).toFixed(2), "MB ->", (na / 1e6).toFixed(2), "MB");
+}

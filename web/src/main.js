@@ -524,33 +524,7 @@ const BEAM = { on: false /* default state of the Beams button / B key */, colour
 // out / above: virtual key light, metres in front of the painting / above its centre. cone: radians. Intensity: see the
 // glare test in WEB_GALLERY.md (30 = blown-out blob, ~8 = soft sheen).
 // jitterOut / jitterSide / jitterUp: total spread (m) of the per-painting random offset of that position.
-const PAINT = { specular: [1, 0.78, 0.55], intensity: 8, out: 0.9, above: 0.35, jitterOut: 0.4, jitterSide: 1.2, jitterUp: 0.4, cone: 1.8, relief: 0.6, reliefStrength: 1.5, reliefSize: 1024, clearCoat: 0.5, clearCoatRoughness: 0.2, canvasRoughness: 0.5 };
-
-// Normal map from the painting itself: luminance read as height, Sobel on the GPU (a ProceduralTexture rendered once, no readback).
-// glTF convention: +X right, +Y up in the image; image rows run along +v, so "up" is -v.
-BABYLON.Effect.ShadersStore.artReliefFragmentShader = `
-  precision highp float;
-  varying vec2 vUV;
-  uniform sampler2D src; uniform vec2 texel; uniform float strength;
-  float L(float dx, float dy) { return dot(texture2D(src, vUV + vec2(dx, dy) * texel).rgb, vec3(0.299, 0.587, 0.114)); }
-  void main() {
-    float tl = L(-1., -1.), t = L(0., -1.), tr = L(1., -1.), l = L(-1., 0.), r = L(1., 0.), bl = L(-1., 1.), b = L(0., 1.), br = L(1., 1.);
-    float dx = (tr + 2. * r + br) - (tl + 2. * l + bl);
-    float dv = (bl + 2. * b + br) - (tl + 2. * t + tr);
-    gl_FragColor = vec4(normalize(vec3(-dx * strength, dv * strength, 1.0)) * 0.5 + 0.5, 1.0);
-  }`;
-function reliefMap(albedo) {
-  const size = PAINT.reliefSize;
-  const p = new BABYLON.ProceduralTexture("relief_" + albedo.name, size, "artRelief", scene, null, true);
-  p.setTexture("src", albedo);
-  p.setVector2("texel", new BABYLON.Vector2(1 / size, 1 / size));
-  p.setFloat("strength", PAINT.reliefStrength);
-  p.refreshRate = 1;                                                                         // every frame until the painting texture has arrived, then once more and stop
-  const obs = scene.onBeforeRenderObservable.add(() => {
-    if (albedo.isReady() && p.isReady()) { p.refreshRate = 0; scene.onBeforeRenderObservable.remove(obs); }
-  });
-  return p;
-}
+const PAINT = { specular: [1, 0.78, 0.55], intensity: 8, out: 0.9, above: 0.35, jitterOut: 0.4, jitterSide: 1.2, jitterUp: 0.4, cone: 1.8, relief: 4, clearCoat: 0.5, clearCoatRoughness: 0.2, canvasRoughness: 0.5 };
 
 function setupLightPlay(bl, art) {
   const V = BABYLON.Vector3, o0 = bl(0, 0, 0);
@@ -583,14 +557,13 @@ function setupLightPlay(bl, art) {
       canvasMat.clearCoat.isEnabled = true;
       canvasMat.clearCoat.intensity = PAINT.clearCoat;
       canvasMat.clearCoat.roughness = PAINT.clearCoatRoughness;
-      if (PAINT.relief > 0 && canvasMat.albedoTexture) {                                     // brush ridges catch the light: relief from the colour image
-        const nm = reliefMap(canvasMat.albedoTexture);
-        nm.level = PAINT.relief;
-        reliefs.push(nm);
-        canvasMat.bumpTexture = nm;
-        canvasMat.clearCoat.bumpTexture = nm;                                                // the varnish follows the paint surface
-        canvasMat.invertNormalMapX = true;                                                   // glTF normal-map convention in this left-handed scene (what the glTF loader sets)
-      }
+      // Brush ridges catch the light: the Blender bump (bake_art_normals.py), glTF convention, 8-bit linear, UV 0 (top-left origin).
+      const nm = new BABYLON.Texture("assets/normals/" + canvasMat.name + ".webp", scene, { invertY: false });
+      nm.level = PAINT.relief;
+      reliefs.push(nm);
+      canvasMat.bumpTexture = nm;
+      canvasMat.clearCoat.bumpTexture = nm;                                                  // the varnish follows the paint surface
+      canvasMat.invertNormalMapX = true;                                                     // glTF normal-map convention in this left-handed scene (what the glTF loader sets)
     }
     const l = new BABYLON.SpotLight("spec_" + name, pos, c.subtract(pos).normalize(), PAINT.cone, 1, scene);
     // PBR takes the specular colour from the light's DIFFUSE colour; LIGHTMAP_SPECULAR then drops the diffuse part (the lightmap has it)
