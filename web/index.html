@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="id">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -26,18 +26,18 @@
 <canvas id="renderCanvas" tabindex="0"></canvas>
 
 <audio id="music" src="assets/audio/music.mp3" loop preload="auto"></audio>
-<button id="mute" type="button">&#9835; Musik: on</button>
+<button id="mute" type="button">&#9835; Music: on</button>
 
 <div id="loading" class="overlay">
-  <div>Memuat galeri&hellip;</div>
+  <div>Loading gallery&hellip;</div>
   <div id="bar"><i></i></div>
   <div id="msg"></div>
 </div>
 
 <div id="hint" class="overlay hidden">
-  <div>Klik untuk mulai berjalan</div>
-  <div><b>W A S D</b>: jalan &nbsp;&middot;&nbsp; <b>&larr; &rarr; &uarr; &darr;</b> atau <b>mouse</b>: lihat sekitar</div>
-  <small>Esc untuk melepas kursor &middot; M untuk mute musik</small>
+  <div>Click to start walking</div>
+  <div><b>W A S D</b>: walk &nbsp;&middot;&nbsp; <b>&larr; &rarr; &uarr; &darr;</b> or <b>mouse</b>: look around</div>
+  <small>Esc to release the cursor &middot; M to mute music</small>
 </div>
 
 <!-- Pinned release, not the nightly root. Self-host before production. -->

@@ -94,7 +94,7 @@ const DUST = { x: [-3.2, 3.2], y: [-22.2, -6.9], z: [0.3, 6.6], count: 400 };
   // Music: browsers block autoplay, so it starts on the hint click. 3-min loop; M or the button mutes.
   const music = $("music"), muteBtn = $("mute");
   music.volume = 0.5;
-  const toggleMute = () => { music.muted = !music.muted; muteBtn.textContent = "♫ Musik: " + (music.muted ? "off" : "on"); };
+  const toggleMute = () => { music.muted = !music.muted; muteBtn.textContent = "♫ Music: " + (music.muted ? "off" : "on"); };
   muteBtn.addEventListener("click", (e) => { toggleMute(); e.stopPropagation(); canvas.focus(); });
   addEventListener("keydown", (e) => { if (e.code === "KeyM") toggleMute(); });
 
@@ -112,7 +112,7 @@ const DUST = { x: [-3.2, 3.2], y: [-22.2, -6.9], z: [0.3, 6.6], count: 400 };
   window.__g = { engine, scene, camera, pipeline, root, bl, baked, lights, env };   // handle for console checks
 })().catch((err) => {
   console.error(err);
-  $("msg").textContent = "Gagal memuat: " + err.message;
+  $("msg").textContent = "Failed to load: " + err.message;
 });
 
 function prepareMeshes(meshes) {
@@ -210,8 +210,8 @@ function setupLights(baked) {
 }
 
 function setupCamera(bl) {
-  const cam = new BABYLON.UniversalCamera("walk", bl(0, 0.9, 1.7), scene);
-  cam.setTarget(bl(0, -12, 1.6));
+  const cam = new BABYLON.UniversalCamera("walk", bl(0, -7.4, 1.7), scene);   // = CAM_hero_hall: hall side of the partition, facing the hero painting
+  cam.setTarget(bl(0, -22.66, 1.6));
   cam.fov = 0.8;                                        // ~24 mm lens on 16:9, same as the still cameras
   cam.minZ = 0.05;
   cam.maxZ = 120;                                       // sky dome radius ~37 m
