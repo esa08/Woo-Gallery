@@ -1,0 +1,194 @@
+{
+  "gallery_walls": {
+    "file": "lightmaps/gallery_walls.webp",
+    "scale": 1.25,
+    "res": 2048,
+    "mean": 0.17926064133644104,
+    "p999": 1.1271941661834717,
+    "coverage": 0.38288187980651855,
+    "albedo": "lightmaps/gallery_walls_albedo.webp",
+    "albedoRes": 1024
+  },
+  "gallery_floor": {
+    "file": "lightmaps/gallery_floor.webp",
+    "scale": 2,
+    "res": 2048,
+    "mean": 0.2794088125228882,
+    "p999": 1.7873414754867554,
+    "coverage": 0.6048414707183838
+  },
+  "gallery_ceiling": {
+    "file": "lightmaps/gallery_ceiling.webp",
+    "scale": 2.25,
+    "res": 2048,
+    "mean": 0.20520098507404327,
+    "p999": 2.123415470123291,
+    "coverage": 0.6799182891845703
+  },
+  "gallery_trims": {
+    "file": "lightmaps/gallery_trims.webp",
+    "scale": 2.25,
+    "res": 512,
+    "mean": 0.24839438498020172,
+    "p999": 2.1976189613342285,
+    "coverage": 0.5414085388183594
+  },
+  "gallery_door_window_frames": {
+    "file": "lightmaps/gallery_door_window_frames.webp",
+    "scale": 2.5,
+    "res": 512,
+    "mean": 0.3165057301521301,
+    "p999": 2.3865840435028076,
+    "coverage": 0.4807167053222656
+  },
+  "art_01_hero_frame": {
+    "file": "lightmaps/art_01_hero_frame.webp",
+    "scale": 1,
+    "res": 512,
+    "mean": 0.2619820833206177,
+    "p999": 0.9593379497528076,
+    "coverage": 0.5710945129394531
+  },
+  "art_02_frame": {
+    "file": "lightmaps/art_02_frame.webp",
+    "scale": 1.5,
+    "res": 256,
+    "mean": 0.2439388483762741,
+    "p999": 1.4625005722045898,
+    "coverage": 0.8580780029296875
+  },
+  "art_03_frame": {
+    "file": "lightmaps/art_03_frame.webp",
+    "scale": 1,
+    "res": 256,
+    "mean": 0.05953361466526985,
+    "p999": 0.19031807780265808,
+    "coverage": 0.72491455078125
+  },
+  "art_04_frame": {
+    "file": "lightmaps/art_04_frame.webp",
+    "scale": 1.5,
+    "res": 256,
+    "mean": 0.22508351504802704,
+    "p999": 1.313432216644287,
+    "coverage": 0.6904449462890625
+  },
+  "art_05_frame": {
+    "file": "lightmaps/art_05_frame.webp",
+    "scale": 1.25,
+    "res": 256,
+    "mean": 0.208220437169075,
+    "p999": 1.2333788871765137,
+    "coverage": 0.8591461181640625
+  },
+  "art_06_frame": {
+    "file": "lightmaps/art_06_frame.webp",
+    "scale": 1.5,
+    "res": 256,
+    "mean": 0.22413097321987152,
+    "p999": 1.359420895576477,
+    "coverage": 0.8488922119140625
+  },
+  "art_07_frame": {
+    "file": "lightmaps/art_07_frame.webp",
+    "scale": 1.5,
+    "res": 256,
+    "mean": 0.22301065921783447,
+    "p999": 1.261252999305725,
+    "coverage": 0.7667388916015625
+  },
+  "art_08_frame": {
+    "file": "lightmaps/art_08_frame.webp",
+    "scale": 2,
+    "res": 256,
+    "mean": 0.2614181637763977,
+    "p999": 1.7673512697219849,
+    "coverage": 0.85626220703125
+  },
+  "art_09_frame": {
+    "file": "lightmaps/art_09_frame.webp",
+    "scale": 1,
+    "res": 256,
+    "mean": 0.059249747544527054,
+    "p999": 0.16783007979393005,
+    "coverage": 0.719482421875
+  },
+  "bench_seat": {
+    "file": "lightmaps/bench_seat.webp",
+    "scale": 1,
+    "res": 128,
+    "mean": 0.2697061598300934,
+    "p999": 0.6607179641723633,
+    "coverage": 0.932373046875,
+    "albedo": "lightmaps/bench_seat_albedo.webp",
+    "albedoRes": 256
+  },
+  "plinth_1": {
+    "file": "lightmaps/plinth_1.webp",
+    "scale": 1,
+    "res": 128,
+    "mean": 0.1555323451757431,
+    "p999": 0.4844309091567993,
+    "coverage": 0.77276611328125
+  },
+  "plinth_2": {
+    "file": "lightmaps/plinth_2.webp",
+    "scale": 1,
+    "res": 128,
+    "mean": 0.16290827095508575,
+    "p999": 0.4859207272529602,
+    "coverage": 0.7730712890625
+  },
+  "sculpture_marble": {
+    "file": "lightmaps/sculpture_marble.webp",
+    "scale": 1,
+    "res": 128,
+    "mean": 0.20166148245334625,
+    "p999": 0.544368326663971,
+    "coverage": 0.73602294921875,
+    "albedo": "lightmaps/sculpture_marble_albedo.webp",
+    "albedoRes": 256
+  },
+  "table_top": {
+    "file": "lightmaps/table_top.webp",
+    "scale": 1,
+    "res": 128,
+    "mean": 0.0661531612277031,
+    "p999": 0.15578696131706238,
+    "coverage": 0.76513671875,
+    "albedo": "lightmaps/table_top_albedo.webp",
+    "albedoRes": 256
+  },
+  "plant_pot": {
+    "file": "lightmaps/plant_pot.webp",
+    "scale": 1,
+    "res": 128,
+    "mean": 0.05653023347258568,
+    "p999": 0.15968598425388336,
+    "coverage": 0.6246337890625
+  },
+  "plant_leaves": {
+    "file": "lightmaps/plant_leaves.webp",
+    "scale": 1,
+    "res": 128,
+    "mean": 0.022840335965156555,
+    "p999": 0.08977188915014267,
+    "coverage": 0.65277099609375
+  },
+  "outlet_plate": {
+    "file": "lightmaps/outlet_plate.webp",
+    "scale": 1,
+    "res": 64,
+    "mean": 0.13347266614437103,
+    "p999": 0.30524584650993347,
+    "coverage": 0.921142578125
+  },
+  "smoke_detector": {
+    "file": "lightmaps/smoke_detector.webp",
+    "scale": 3.75,
+    "res": 64,
+    "mean": 0.6021360158920288,
+    "p999": 3.5826947689056396,
+    "coverage": 0.699462890625
+  }
+}

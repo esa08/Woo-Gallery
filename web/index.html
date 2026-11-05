@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wood Gallery</title>
+<style>
+  :root { color-scheme: dark; --bg:#0d0b09; --fg:#e8e0d4; --muted:#8c8274; --accent:#d9a066; }
+  html, body { margin:0; width:100%; height:100%; overflow:hidden; background:var(--bg); color:var(--fg);
+               font:15px/1.5 system-ui, "Segoe UI", sans-serif; }
+  #renderCanvas { width:100%; height:100%; display:block; touch-action:none; outline:none; }
+  .overlay { position:fixed; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
+             gap:14px; background:var(--bg); transition:opacity .5s; text-align:center; padding:24px; }
+  .overlay.hidden { opacity:0; pointer-events:none; }
+  #bar { width:min(320px, 70vw); height:3px; background:#2a251f; border-radius:2px; overflow:hidden; }
+  #bar i { display:block; height:100%; width:0; background:var(--accent); transition:width .2s; }
+  #hint { background:rgba(13,11,9,.55); cursor:pointer; }
+  #hint b { color:var(--accent); font-weight:600; }
+  #hint small { color:var(--muted); }
+  #msg { color:var(--muted); }
+</style>
+</head>
+<body>
+<canvas id="renderCanvas" tabindex="0"></canvas>
+
+<div id="loading" class="overlay">
+  <div>Memuat galeri&hellip;</div>
+  <div id="bar"><i></i></div>
+  <div id="msg"></div>
+</div>
+
+<div id="hint" class="overlay hidden">
+  <div>Klik untuk mulai berjalan</div>
+  <div><b>W A S D</b>: jalan &nbsp;&middot;&nbsp; <b>&larr; &rarr; &uarr; &darr;</b> atau <b>mouse</b>: lihat sekitar</div>
+  <small>Esc untuk melepas kursor</small>
+</div>
+
+<!-- Pinned release, not the nightly root. Self-host before production. -->
+<script src="https://cdn.babylonjs.com/v9.0.0/babylon.js"></script>
+<script src="https://cdn.babylonjs.com/v9.0.0/loaders/babylonjs.loaders.min.js"></script>
+<script src="src/main.js"></script>
+</body>
+</html>

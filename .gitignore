@@ -1,0 +1,6 @@
+renders/
+build/
+.claude/
+node_modules/
+*.blend1
+WOOD-GALLERY_v0[1-9].blend
