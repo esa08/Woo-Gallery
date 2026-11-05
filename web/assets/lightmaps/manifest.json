@@ -3,9 +3,9 @@
     "file": "lightmaps/gallery_walls.webp",
     "scale": 1.25,
     "res": 2048,
-    "mean": 0.17926064133644104,
-    "p999": 1.1271941661834717,
-    "coverage": 0.38288187980651855,
+    "mean": 0.18585199117660522,
+    "p999": 1.1307997703552246,
+    "coverage": 0.3842136859893799,
     "albedo": "lightmaps/gallery_walls_albedo.webp",
     "albedoRes": 1024
   },
@@ -13,9 +13,9 @@
     "file": "lightmaps/gallery_floor.webp",
     "scale": 2,
     "res": 2048,
-    "mean": 0.2794088125228882,
-    "p999": 1.7873414754867554,
-    "coverage": 0.6048414707183838
+    "mean": 0.2838670313358307,
+    "p999": 1.7873178720474243,
+    "coverage": 0.6049849987030029
   },
   "gallery_ceiling": {
     "file": "lightmaps/gallery_ceiling.webp",
@@ -29,17 +29,17 @@
     "file": "lightmaps/gallery_trims.webp",
     "scale": 2.25,
     "res": 512,
-    "mean": 0.24839438498020172,
-    "p999": 2.1976189613342285,
-    "coverage": 0.5414085388183594
+    "mean": 0.25312504172325134,
+    "p999": 2.198288679122925,
+    "coverage": 0.5413970947265625
   },
   "gallery_door_window_frames": {
     "file": "lightmaps/gallery_door_window_frames.webp",
     "scale": 2.5,
     "res": 512,
-    "mean": 0.3165057301521301,
-    "p999": 2.3865840435028076,
-    "coverage": 0.4807167053222656
+    "mean": 0.31832531094551086,
+    "p999": 2.3808627128601074,
+    "coverage": 0.4807929992675781
   },
   "art_01_hero_frame": {
     "file": "lightmaps/art_01_hero_frame.webp",
@@ -61,9 +61,9 @@
     "file": "lightmaps/art_03_frame.webp",
     "scale": 1,
     "res": 256,
-    "mean": 0.05953361466526985,
-    "p999": 0.19031807780265808,
-    "coverage": 0.72491455078125
+    "mean": 0.11483873426914215,
+    "p999": 0.41864871978759766,
+    "coverage": 0.7566070556640625
   },
   "art_04_frame": {
     "file": "lightmaps/art_04_frame.webp",
@@ -109,9 +109,9 @@
     "file": "lightmaps/art_09_frame.webp",
     "scale": 1,
     "res": 256,
-    "mean": 0.059249747544527054,
-    "p999": 0.16783007979393005,
-    "coverage": 0.719482421875
+    "mean": 0.15027178823947906,
+    "p999": 0.8063031435012817,
+    "coverage": 0.7574310302734375
   },
   "bench_seat": {
     "file": "lightmaps/bench_seat.webp",
@@ -153,8 +153,8 @@
     "file": "lightmaps/table_top.webp",
     "scale": 1,
     "res": 128,
-    "mean": 0.0661531612277031,
-    "p999": 0.15578696131706238,
+    "mean": 0.18148940801620483,
+    "p999": 0.4724040627479553,
     "coverage": 0.76513671875,
     "albedo": "lightmaps/table_top_albedo.webp",
     "albedoRes": 256
@@ -163,17 +163,17 @@
     "file": "lightmaps/plant_pot.webp",
     "scale": 1,
     "res": 128,
-    "mean": 0.05653023347258568,
-    "p999": 0.15968598425388336,
-    "coverage": 0.6246337890625
+    "mean": 0.07574097067117691,
+    "p999": 0.30035310983657837,
+    "coverage": 0.624755859375
   },
   "plant_leaves": {
     "file": "lightmaps/plant_leaves.webp",
     "scale": 1,
     "res": 128,
-    "mean": 0.022840335965156555,
-    "p999": 0.08977188915014267,
-    "coverage": 0.65277099609375
+    "mean": 0.03317908197641373,
+    "p999": 0.1388523429632187,
+    "coverage": 0.6676025390625
   },
   "outlet_plate": {
     "file": "lightmaps/outlet_plate.webp",

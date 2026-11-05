@@ -66,12 +66,21 @@ class LightmapGloss extends BABYLON.MaterialPluginBase {
 // Hall dust box in Blender coords (GALLERY_SCENE.md section 8).
 const DUST = { x: [-3.2, 3.2], y: [-22.2, -6.9], z: [0.3, 6.6], count: 400 };
 
+// Loading bar. The work is staged (GLB -> reflections -> lightmaps -> shader compile) and every stage reports in, because
+// a GLB served with gzip has no Content-Length (lengthComputable = false) and the later stages block the main thread.
+// After each update we give the browser one paint (setTimeout fallback: rAF is paused in background tabs).
+const GLB_BYTES = 8.5e6;                                // size of assets/gallery.glb, only used when the server sends no length
+const bar = $("bar").firstElementChild;
+const setBar = (p, msg) => { bar.style.width = (Math.min(p, 1) * 100).toFixed(1) + "%"; if (msg) $("msg").textContent = msg; };
+const paint = () => new Promise((res) => { const t = setTimeout(res, 50); requestAnimationFrame(() => { clearTimeout(t); res(); }); });
+const step = async (p, msg) => { setBar(p, msg); await paint(); };
+
 (async function main() {
+  await step(0.02, "Downloading gallery…");
   const result = await BABYLON.ImportMeshAsync("assets/gallery.glb", scene, {
-    onProgress: (e) => {
-      if (e.lengthComputable) $("bar").firstElementChild.style.width = (e.loaded * 100 / e.total) + "%";
-    },
+    onProgress: (e) => setBar(0.02 + 0.5 * Math.min(e.loaded / (e.lengthComputable ? e.total : GLB_BYTES), 1)),   // 2% .. 52%
   });
+  await step(0.55, "Preparing scene…");
   const root = result.meshes[0];                        // "__root__": carries the glTF handedness flip
   root.computeWorldMatrix(true);
   // Blender (x, y, z, Z-up) -> glTF (x, z, -y) -> Babylon world through the root matrix. No guessing of axis flips.
@@ -79,14 +88,19 @@ const DUST = { x: [-3.2, 3.2], y: [-22.2, -6.9], z: [0.3, 6.6], count: 400 };
 
   prepareMeshes(result.meshes);
   prepareMaterials();
+  await step(0.58, "Loading reflections…");
   const env = await setupEnvironment(bl);
-  const baked = await applyLightmaps();
+  await step(0.68, "Loading lighting…");
+  const baked = await applyLightmaps((f) => setBar(0.68 + 0.2 * f));   // 68% .. 88%
   const lights = setupLights(baked);
   const camera = setupCamera(bl);
   const pipeline = setupPipeline(camera);
   setupDust(bl);
+  const focus = setupPaintingFocus(camera, result.meshes, bl);
 
+  await step(0.9, "Compiling shaders…");
   await scene.whenReadyAsync();
+  await step(1, "Ready");
   // Freeze after everything compiled once. Not freezeActiveMeshes: the camera moves, frozen culling would pop meshes.
   scene.materials.forEach((m) => m.freeze());
   result.meshes.forEach((m) => m.freezeWorldMatrix());
@@ -109,7 +123,7 @@ const DUST = { x: [-3.2, 3.2], y: [-22.2, -6.9], z: [0.3, 6.6], count: 400 };
   // ponytail: one-shot resolution drop, no tiers. Add SceneOptimizer / quality tiers if this is not enough.
   setTimeout(() => { if (engine.getFps() < 40) engine.setHardwareScalingLevel(1.5); }, 6000);
 
-  window.__g = { engine, scene, camera, pipeline, root, bl, baked, lights, env };   // handle for console checks
+  window.__g = { engine, scene, camera, pipeline, root, bl, baked, lights, env, focus };   // handle for console checks
 })().catch((err) => {
   console.error(err);
   $("msg").textContent = "Failed to load: " + err.message;
@@ -151,7 +165,7 @@ const baseName = (n) => n.replace(/_primitive\d+$/, "");   // multi-material mes
 // Lightmaps carry lighting only (Cycles Diffuse, Direct+Indirect, no Color). Babylon PBR with
 // useLightmapAsShadowmap computes (lights * albedo + ...) * lightmap, so a uniform white hemispheric light
 // (see setupLights) turns that into albedo * baked lighting and keeps the 1K wood/plaster textures sharp.
-async function applyLightmaps() {
+async function applyLightmaps(onProgress = () => {}) {
   let manifest;
   try {
     const r = await fetch("assets/lightmaps/manifest.json");
@@ -159,13 +173,21 @@ async function applyLightmaps() {
     manifest = await r.json();
   } catch (e) { return []; }
   const baked = [];
+  const total = Object.values(manifest).reduce((n, i) => n + (i.file ? 1 : 0) + (i.albedo ? 1 : 0), 0);
+  let loaded = 0;
+  const loads = [];                                    // one promise per texture, so the loading bar can follow the downloads
+  const load = (file) => {
+    let done;
+    loads.push(new Promise((res) => { done = () => { onProgress(++loaded / total); res(); }; }));
+    return new BABYLON.Texture("assets/" + file, scene, { invertY: false, onLoad: done, onError: done });   // glTF UVs are top-left origin
+  };
   for (const [name, info] of Object.entries(manifest)) {
-    const tex = new BABYLON.Texture("assets/" + info.file, scene, { invertY: false });   // glTF UVs are top-left origin
+    const tex = load(info.file);
     tex.coordinatesIndex = 1;                          // UV2 = TEXCOORD_1
     tex.level = info.scale;                            // image stores linear / scale
     let albedo = null;
     if (info.albedo) {
-      albedo = new BABYLON.Texture("assets/" + info.albedo, scene, { invertY: false });
+      albedo = load(info.albedo);
       albedo.coordinatesIndex = 1;                     // baked on the lightmap UV
     }
     for (const m of scene.meshes.filter((x) => baseName(x.name) === name)) {
@@ -182,6 +204,7 @@ async function applyLightmaps() {
       baked.push(m);
     }
   }
+  await Promise.all(loads);
   return baked;
 }
 
@@ -233,6 +256,128 @@ function setupCamera(bl) {
   cam.checkCollisions = true;
   cam.ellipsoid = new BABYLON.Vector3(0.35, 0.8, 0.35); // eye sits at the top of the ellipsoid: settles at y = 1.608 (measured)
   return cam;
+}
+
+// Click a painting -> the camera glides to a spot in front of it, looking at its centre. Pointer lock hides the cursor, so
+// the "cursor" is the screen centre (a dot, which grows over a painting). The glide does NOT use collisions: sliding along a
+// wall dead-ends when the target is seen through a doorway at an angle. It follows a route instead: straight on the same side
+// of the partition, through the nearest doorway when the painting is on the other side. Everything else in the gallery is
+// below eye height (bench, plinths, table), so the camera passes over it.
+const DOORS = [-2.0, 2.0];                               // Blender x of the two partition doorway centres (openings 1.3..2.7 m, ray cast)
+function setupPaintingFocus(cam, meshes, bl) {
+  const V = BABYLON.Vector3;
+  const zEnt = bl(0, -5.0, 0).z, zDoor = bl(0, -6.4, 0).z, zHall = bl(0, -7.9, 0).z;   // gates ~1.2 m before / after the wall faces
+  const zone = (p) => (p.z < bl(0, -6.0, 0).z ? 0 : p.z > bl(0, -6.8, 0).z ? 2 : 1);  // 0 entrance, 1 inside the partition, 2 hall
+  function route(from, end) {
+    const a = zone(from), b = zone(end);
+    if (a === b) return [from, end];
+    const dx = DOORS.map((d) => bl(d, 0, 0).x).reduce((best, x) => (Math.abs(from.x - x) + Math.abs(end.x - x) < Math.abs(from.x - best) + Math.abs(end.x - best) ? x : best));
+    const gates = [zEnt, zDoor, zHall].map((z) => new V(dx, from.y, z));
+    const idx = a < b ? [a === 0 ? 0 : 1, b] : [a === 2 ? 2 : 1, b === 0 ? 0 : 1];
+    const nodes = [];
+    for (let i = idx[0]; i !== idx[1]; i += a < b ? 1 : -1) nodes.push(gates[i]);
+    nodes.push(gates[idx[1]]);
+    return [from, ...nodes, end];
+  }
+  function smooth(pts) {                                 // Chaikin corner cutting, end points stay
+    for (let k = 0; k < 2; k++) {
+      const out = [pts[0]];
+      for (let i = 0; i < pts.length - 1; i++) {
+        out.push(V.Lerp(pts[i], pts[i + 1], 0.25), V.Lerp(pts[i], pts[i + 1], 0.75));
+      }
+      out.push(pts[pts.length - 1]);
+      pts = out;
+    }
+    return pts;
+  }
+  const art = new Map();                                // "art_09_frame" -> its meshes (canvas, edge and frame are separate primitives)
+  for (const m of meshes) {
+    const n = baseName(m.name);
+    if (!/^art_\d+(?:_hero)?_frame$/.test(n)) continue;
+    m.isPickable = true;
+    if (!art.has(n)) art.set(n, []);
+    art.get(n).push(m);
+  }
+  const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+  const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));            // shortest turn
+  let flight = null;
+
+  const pickAtCentre = () => {
+    const hit = scene.pick(engine.getRenderWidth() / 2, engine.getRenderHeight() / 2, (m) => m.isPickable);
+    return hit.hit ? { name: baseName(hit.pickedMesh.name), normal: hit.getNormal(true) } : null;   // normal: world space, tells which side faces the room
+  };
+
+  function stop() {
+    if (!flight) return;
+    flight = null;
+    cam.cameraDirection.setAll(0); cam.cameraRotation.setAll(0);
+    cam.attachControl(canvas, true);
+    canvas.focus();
+  }
+
+  function flyTo(name, faceNormal) {
+    const ms = art.get(name);
+    if (!ms) return false;
+    stop();
+    const min = new BABYLON.Vector3(Infinity, Infinity, Infinity), max = min.scale(-1);
+    for (const m of ms) {
+      m.computeWorldMatrix(true);
+      const b = m.getBoundingInfo().boundingBox;
+      min.minimizeInPlace(b.minimumWorld); max.maximizeInPlace(b.maximumWorld);
+    }
+    const size = max.subtract(min), centre = min.add(max).scale(0.5);
+    // Paintings are upright: the thinner of x / z is the wall normal, pointing to the side the camera is on.
+    const nAxis = size.x < size.z ? "x" : "z", wAxis = nAxis === "x" ? "z" : "x";
+    const normal = new BABYLON.Vector3(0, 0, 0);
+    // Side: the picked face normal when we have one, else the side the camera is on.
+    normal[nAxis] = faceNormal && Math.abs(faceNormal[nAxis]) > 0.3 ? Math.sign(faceNormal[nAxis]) : Math.sign(cam.position[nAxis] - centre[nAxis]) || 1;
+    const half = Math.tan(cam.fov / 2);
+    const dist = Math.min(4, Math.max(1.4, 1.25 * Math.max(size.y / 2 / half, size[wAxis] / 2 / (half * engine.getAspectRatio(cam)))));
+    const end = centre.add(normal.scale(dist));
+    end.y = cam.position.y;                              // keep the eye where gravity put it
+    const dx = centre.x - end.x, dz = centre.z - end.z;
+    const yaw = Math.atan2(dx, dz), pitch = Math.atan2(end.y - centre.y, Math.hypot(dx, dz));
+    const from = cam.position.clone();
+    const r0 = cam.rotation.clone();
+    const path = smooth(route(from, end));
+    const cum = [0];
+    for (let i = 1; i < path.length; i++) cum.push(cum[i - 1] + V.Distance(path[i - 1], path[i]));
+    const dur = Math.min(3200, Math.max(1000, 700 + cum[cum.length - 1] * 200));
+    cam.detachControl();                                 // no input fights the glide; any key press ends it early
+    flight = { t0: performance.now(), dur, path, cum, r0, yaw: r0.y + wrap(yaw - r0.y), pitch };
+    return { dist, end: end.asArray(), yaw, pitch, size: size.asArray(), via: path.length };
+  }
+
+  scene.onBeforeRenderObservable.add(() => {
+    if (!flight) return;
+    const f = flight, t = Math.min(1, (performance.now() - f.t0) / f.dur), e = ease(t);
+    const d = e * f.cum[f.cum.length - 1];
+    let i = 1;
+    while (i < f.cum.length - 1 && f.cum[i] < d) i++;
+    const seg = f.cum[i] - f.cum[i - 1];
+    V.LerpToRef(f.path[i - 1], f.path[i], seg > 0 ? (d - f.cum[i - 1]) / seg : 1, cam.position);
+    cam.rotation.y = f.r0.y + (f.yaw - f.r0.y) * e;
+    cam.rotation.x = f.r0.x + (f.pitch - f.r0.x) * e;
+    if (t >= 1) stop();
+  });
+
+  canvas.addEventListener("click", () => {
+    if (!engine.isPointerLock) return;
+    const p = pickAtCentre();
+    if (p) flyTo(p.name, p.normal);
+  });
+  addEventListener("keydown", (e) => { if (flight && !e.repeat && e.code !== "KeyM") stop(); });
+
+  // Dot at the screen centre; grows over a painting. Throttled pick (a few meshes only).
+  const dot = $("cross");
+  let last = 0;
+  scene.onBeforeRenderObservable.add(() => {
+    const now = performance.now();
+    if (now - last < 120) return;
+    last = now;
+    dot.classList.toggle("on", !flight && engine.isPointerLock && !!pickAtCentre());
+  });
+  return { flyTo, stop, art };
 }
 
 function setupPipeline(cam) {

@@ -86,6 +86,12 @@ Nilai ini hasil grid search (4×3×3) terhadap `hero_hall_v09_small.png` memakai
 - Collision hanya pada daftar `SOLID` (lantai, dinding, kaca jendela, door frames, bench, plinth, patung, meja, pot) = 18 mesh. Plafon, trims, dan fixtures tidak.
 - Diuji (simulasi tombol 60 fps): kedua doorway partisi bisa dilewati sampai dinding belakang hall (berhenti di z = 22.31 = 22.66 − 0.35), panel tengah partisi dan meja konsol menahan kamera.
 
+### 2.7b Klik lukisan → glide
+`setupPaintingFocus` (main.js). Pointer lock menyembunyikan kursor, jadi "kursor" = titik di tengah layar (`#cross`, membesar saat di atas lukisan; pick throttled 120 ms). Klik (saat pointer lock) → `scene.pick` di tengah layar → kamera meluncur ke depan lukisan (jarak dihitung agar lukisan muat dengan FOV, 1.4–4 m, mata tetap di tinggi gravity), menghadap pusat lukisan, easing cubic 1–2.5 s berbasis waktu (`performance.now`, aman saat tab di-throttle). Sisi depan = normal face yang di-pick. Gerak **tanpa collision** lewat rute: satu sisi partisi = garis lurus; beda sisi (entrance / hall) = lewat tengah doorway terdekat (`DOORS` = Blender x ±2.0, bukaan 1.3–2.7 m diukur ray cast; gate 1.2 m sebelum/sesudah dinding), dihaluskan Chaikin. Versi pertama memakai `moveWithCollisions` dan macet menempel dinding saat lukisan tujuan dilihat miring lewat doorway. Bench/plinth/meja di bawah tinggi mata, jadi kamera lewat di atasnya. Diuji 5 skenario (tak ada titik jalur di dalam dinding). Input kamera di-`detachControl` selama glide; tombol apa pun menghentikannya. Hanya mesh `art_NN_frame` yang `isPickable`. Uji dari console: `__g.focus.flyTo("art_09_frame")`.
+
+### 2.7c Loading bar
+Bertahap karena GLB lewat gzip tidak punya Content-Length (`lengthComputable=false`, bar lama tidak bergerak) dan tahap berikutnya memblok main thread: GLB 2–52% (fallback `GLB_BYTES` bila total tak diketahui), refleksi 58%, lightmap 68–88% (per tekstur via `onLoad`), shader 90%, siap 100%. Tiap tahap menunggu satu paint (`rAF` + fallback `setTimeout`).
+
 ### 2.8 Dust
 `ParticleSystem` 400 partikel, ukuran 8–18 mm, umur 25–45 s, blend additive, tekstur radial dari `DynamicTexture` (tanpa file). Hanya di **box hall** dari `GALLERY_SCENE.md` §8: dari spawn di entrance belum terlihat, baru setelah masuk hall.
 - Gerak: kecepatan awal 5–12 cm/s lalu `updateFunction` dibungkus dengan **medan aliran sinus** (pusaran ±3 m, tanpa state per partikel) + redaman 0.99/frame. Hasil **(diukur)**: median 5.5 cm/s, rentang 2–10 cm/s, bergeser rata-rata 26 cm per 4.8 s. Versi pertama (0.6 cm/s) tampak diam.
@@ -114,6 +120,8 @@ blender -b WOOD-GALLERY_web.blend -P web/tools/bake_lightmaps.py -- --in-place -
 blender -b WOOD-GALLERY_web.blend -P web/tools/bake_lightmaps.py -- --in-place --no-light --albedo --only gallery_walls
 ```
 Lalu ulangi langkah 2 dan 3. Objek baru didaftarkan di `DEFAULT_RES` (dan `ALBEDO_RES` bila perlu) di `bake_lightmaps.py`.
+
+**Objek/lampu baru dari scene sumber** (tanpa bake ulang semua): `blender -b WOOD-GALLERY_web.blend -P web/tools/sync_objects.py -- nama1,nama2` menyalin objek dari `v10_video.blend` ke copy web (material dipakai ulang berdasarkan nama; lampu masuk `Lighting`, mesh masuk `Gallery`). Lalu bake ulang **semua objek yang terkena cahaya baru** (dinding, lantai, trims, door frames, props di dekatnya), ekspor GLB, optimize. Contoh 2026-11-05 (lampu spot partisi `partition_spot_fixture_hall/ent` + `light_spot_part_hall/ent`): bake `gallery_walls,gallery_floor,gallery_trims,gallery_door_window_frames,art_03_frame,art_09_frame,table_top,plant_pot,plant_leaves` ±11 menit. Fixture hanya IBL (tanpa lightmap), seperti spot fixtures lain.
 
 ### Parameter bake
 - 768 spp, adaptive threshold 0.005, margin 8 px (extend), blur gaussian σ = 1 px yang hanya memakai texel ter-bake (normalized convolution, supaya padding hitam tidak bocor).
