@@ -138,7 +138,7 @@ const step = async (p, msg) => { setBar(p, msg); await paint(); };
     addEventListener("keydown", (e) => { if (e.code === key && !e.repeat) flip(); });
   };
   toggle("beams", "KeyB", "✦ Beams", BEAM.on, play.setBeams);                // light beams + motes: off by default
-  toggle("glare", "KeyG", "✧ Glare", true, play.setGlare);                   // painting varnish highlight + relief
+  toggle("glare", "KeyG", "✧ Glare", false, play.setGlare);                  // painting varnish highlight + relief: off by default
   toggle("floor", "KeyR", "◈ Floor reflection", true, floorRefl.set);        // realtime mirror in the floor
 
   engine.runRenderLoop(() => scene.render());
