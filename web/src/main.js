@@ -303,7 +303,7 @@ function setupPaintingFocus(cam, meshes, bl) {
   let flight = null;
 
   const pickAtCentre = () => {
-    const hit = scene.pick(engine.getRenderWidth() / 2, engine.getRenderHeight() / 2, (m) => m.isPickable);
+    const hit = scene.pick(canvas.clientWidth / 2, canvas.clientHeight / 2, (m) => m.isPickable);   // CSS pixels: pick() divides by the hardware scaling level (the 6 s fallback sets 1.5)
     return hit.hit ? { name: baseName(hit.pickedMesh.name), normal: hit.getNormal(true) } : null;   // normal: world space, tells which side faces the room
   };
 
@@ -361,12 +361,17 @@ function setupPaintingFocus(cam, meshes, bl) {
     if (t >= 1) stop();
   });
 
-  canvas.addEventListener("click", () => {
+  const focusAtCentre = () => {
     if (!engine.isPointerLock) return;
     const p = pickAtCentre();
     if (p) flyTo(p.name, p.normal);
+  };
+  canvas.addEventListener("click", focusAtCentre);
+  addEventListener("keydown", (e) => {
+    if (e.repeat) return;
+    if (e.code === "Enter" || e.code === "NumpadEnter") { if (flight) stop(); else focusAtCentre(); return; }   // Enter = click on the dot
+    if (flight && e.code !== "KeyM") stop();
   });
-  addEventListener("keydown", (e) => { if (flight && !e.repeat && e.code !== "KeyM") stop(); });
 
   // Dot at the screen centre; grows over a painting. Throttled pick (a few meshes only).
   const dot = $("cross");
