@@ -91,10 +91,17 @@ const DUST = { x: [-3.2, 3.2], y: [-22.2, -6.9], z: [0.3, 6.6], count: 400 };
   scene.materials.forEach((m) => m.freeze());
   result.meshes.forEach((m) => m.freezeWorldMatrix());
 
+  // Music: browsers block autoplay, so it starts on the hint click. 3-min loop; M or the button mutes.
+  const music = $("music"), muteBtn = $("mute");
+  music.volume = 0.5;
+  const toggleMute = () => { music.muted = !music.muted; muteBtn.textContent = "♫ Musik: " + (music.muted ? "off" : "on"); };
+  muteBtn.addEventListener("click", (e) => { toggleMute(); e.stopPropagation(); canvas.focus(); });
+  addEventListener("keydown", (e) => { if (e.code === "KeyM") toggleMute(); });
+
   engine.runRenderLoop(() => scene.render());
   $("loading").classList.add("hidden");
   $("hint").classList.remove("hidden");
-  $("hint").addEventListener("click", () => { engine.enterPointerlock(); canvas.focus(); $("hint").classList.add("hidden"); });
+  $("hint").addEventListener("click", () => { music.play().catch(() => {}); engine.enterPointerlock(); canvas.focus(); $("hint").classList.add("hidden"); });
   document.addEventListener("pointerlockchange", () => {
     if (!document.pointerLockElement) $("hint").classList.remove("hidden");
   });

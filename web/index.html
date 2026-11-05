@@ -18,10 +18,15 @@
   #hint b { color:var(--accent); font-weight:600; }
   #hint small { color:var(--muted); }
   #msg { color:var(--muted); }
+  #mute { position:fixed; right:16px; bottom:16px; z-index:5; background:rgba(13,11,9,.55); color:var(--fg); border:1px solid #3a322a;
+          border-radius:20px; padding:6px 14px; font:inherit; cursor:pointer; }
 </style>
 </head>
 <body>
 <canvas id="renderCanvas" tabindex="0"></canvas>
+
+<audio id="music" src="assets/audio/music.mp3" loop preload="auto"></audio>
+<button id="mute" type="button">&#9835; Musik: on</button>
 
 <div id="loading" class="overlay">
   <div>Memuat galeri&hellip;</div>
@@ -32,7 +37,7 @@
 <div id="hint" class="overlay hidden">
   <div>Klik untuk mulai berjalan</div>
   <div><b>W A S D</b>: jalan &nbsp;&middot;&nbsp; <b>&larr; &rarr; &uarr; &darr;</b> atau <b>mouse</b>: lihat sekitar</div>
-  <small>Esc untuk melepas kursor</small>
+  <small>Esc untuk melepas kursor &middot; M untuk mute musik</small>
 </div>
 
 <!-- Pinned release, not the nightly root. Self-host before production. -->
