@@ -31,12 +31,15 @@ const ENV = { probe: [0, -14.66, 3.86], box: [7, 7.72, 16] /* Babylon axes: x, u
 // would be darkened by the floor's own light level. So just before the final composition: drop IBL ambient (the lightmap
 // already has all diffuse light), drop direct specular from the uniform playback light, and divide the reflection by the
 // lightmap so the later multiplication cancels out. Variables are from pbrBlockFinalLitComponents (v9.0.0 bundle).
+// spec = true (paintings): keep direct specular, because setupLightPlay adds spec-only spot lights there. Same trick as the
+// reflection: divide by the lightmap so the multiplication cancels, i.e. the highlight is not darkened by the baked light level.
 class LightmapGloss extends BABYLON.MaterialPluginBase {
-  constructor(material) {
-    super(material, "LightmapGloss", 200, { LMGLOSS: false });
+  constructor(material, spec = false) {
+    super(material, "LightmapGloss", 200, { LMGLOSS: false, LMSPEC: false });
+    this.spec = spec;
     this._enable(true);
   }
-  prepareDefines(defines) { defines.LMGLOSS = true; }
+  prepareDefines(defines) { defines.LMGLOSS = true; defines.LMSPEC = this.spec; }
   getClassName() { return "LightmapGlossPlugin"; }
   isCompatible(shaderLanguage) { return shaderLanguage === BABYLON.ShaderLanguage.GLSL; }
   getCustomCode(shaderType) {
@@ -52,11 +55,20 @@ class LightmapGloss extends BABYLON.MaterialPluginBase {
       clearcoatOut.finalClearCoatRadianceScaled *= lmInv;
     #endif
   #endif
-  #ifdef SPECULARTERM
-    finalSpecularScaled = vec3(0.0);
-  #endif
-  #ifdef CLEARCOAT
-    finalClearCoatScaled = vec3(0.0);
+  #ifdef LMSPEC
+    #ifdef SPECULARTERM
+      finalSpecularScaled *= lmInv;
+    #endif
+    #ifdef CLEARCOAT
+      finalClearCoatScaled *= lmInv;
+    #endif
+  #else
+    #ifdef SPECULARTERM
+      finalSpecularScaled = vec3(0.0);
+    #endif
+    #ifdef CLEARCOAT
+      finalClearCoatScaled = vec3(0.0);
+    #endif
   #endif
 #endif`,
     };
@@ -97,6 +109,9 @@ const step = async (p, msg) => { setBar(p, msg); await paint(); };
   const pipeline = setupPipeline(camera);
   setupDust(bl);
   const focus = setupPaintingFocus(camera, result.meshes, bl);
+  const play = setupLightPlay(bl, focus.art);
+  const floorRefl = setupFloorReflection();
+  const eye = setupEyeAdaptation(camera, pipeline);
 
   await step(0.9, "Compiling shaders…");
   await scene.whenReadyAsync();
@@ -112,6 +127,20 @@ const step = async (p, msg) => { setBar(p, msg); await paint(); };
   muteBtn.addEventListener("click", (e) => { toggleMute(); e.stopPropagation(); canvas.focus(); });
   addEventListener("keydown", (e) => { if (e.code === "KeyM") toggleMute(); });
 
+  // Effect toggles: a button (right bottom) + a key. apply(on) must only change uniforms (materials are frozen).
+  const toggle = (id, key, label, initial, apply) => {
+    const btn = $(id);
+    let on = initial;
+    const show = () => { apply(on); btn.textContent = label + ": " + (on ? "on" : "off"); };
+    const flip = () => { on = !on; show(); };
+    show();
+    btn.addEventListener("click", (e) => { flip(); e.stopPropagation(); canvas.focus(); });
+    addEventListener("keydown", (e) => { if (e.code === key && !e.repeat) flip(); });
+  };
+  toggle("beams", "KeyB", "✦ Beams", BEAM.on, play.setBeams);                // light beams + motes: off by default
+  toggle("glare", "KeyG", "✧ Glare", true, play.setGlare);                   // painting varnish highlight + relief
+  toggle("floor", "KeyR", "◈ Floor reflection", true, floorRefl.set);        // realtime mirror in the floor
+
   engine.runRenderLoop(() => scene.render());
   $("loading").classList.add("hidden");
   $("hint").classList.remove("hidden");
@@ -123,7 +152,7 @@ const step = async (p, msg) => { setBar(p, msg); await paint(); };
   // ponytail: one-shot resolution drop, no tiers. Add SceneOptimizer / quality tiers if this is not enough.
   setTimeout(() => { if (engine.getFps() < 40) engine.setHardwareScalingLevel(1.5); }, 6000);
 
-  window.__g = { engine, scene, camera, pipeline, root, bl, baked, lights, env, focus };   // handle for console checks
+  window.__g = { engine, scene, camera, pipeline, root, bl, baked, lights, env, focus, play, floorRefl, eye };   // handle for console checks
 })().catch((err) => {
   console.error(err);
   $("msg").textContent = "Failed to load: " + err.message;
@@ -200,7 +229,7 @@ async function applyLightmaps(onProgress = () => {}) {
         m.material.albedoTexture = albedo;
         m.material.albedoColor = BABYLON.Color3.White();
       }
-      new LightmapGloss(m.material);                   // keeps IBL reflections out of the lightmap multiplication
+      new LightmapGloss(m.material, /^art_/.test(name)); // keeps IBL reflections out of the lightmap multiplication
       baked.push(m);
     }
   }
@@ -370,7 +399,7 @@ function setupPaintingFocus(cam, meshes, bl) {
   addEventListener("keydown", (e) => {
     if (e.repeat) return;
     if (e.code === "Enter" || e.code === "NumpadEnter") { if (flight) stop(); else focusAtCentre(); return; }   // Enter = click on the dot
-    if (flight && e.code !== "KeyM") stop();
+    if (flight && !["KeyM", "KeyB", "KeyG", "KeyR"].includes(e.code)) stop();
   });
 
   // Dot at the screen centre; grows over a painting. Throttled pick (a few meshes only).
@@ -412,7 +441,7 @@ function setupPipeline(cam) {
 }
 
 // Sparse, tiny, slow. At density 0.0045 / 3500 motes the Blender render looked like snow: stay small.
-function setupDust(bl) {
+function dustTexture() {
   const tex = new BABYLON.DynamicTexture("dust", 64, scene, true);
   tex.hasAlpha = true;
   const g = tex.getContext();
@@ -423,7 +452,11 @@ function setupDust(bl) {
   g.fillStyle = grad;
   g.fillRect(0, 0, 64, 64);
   tex.update();
+  return tex;
+}
 
+function setupDust(bl) {
+  const tex = dustTexture();
   const [x0, x1] = DUST.x, [y0, y1] = DUST.y, [z0, z1] = DUST.z;
   const ps = new BABYLON.ParticleSystem("dust", DUST.count, scene);
   ps.particleTexture = tex;
@@ -464,4 +497,282 @@ function setupDust(bl) {
   ps.blendMode = BABYLON.ParticleSystem.BLENDMODE_ADD;
   ps.preWarmCycles = 600; ps.preWarmStepOffset = 4;
   ps.start();
+}
+
+// ---- Light play: view-dependent highlights on the paintings + visible light beams with dust --------------------------------
+// The lightmaps are static, so they cannot show a highlight that moves with the viewer or the air that the spots shine through.
+// (1) Paintings: varnish (clearcoat) on the canvas + one specular-only light per painting (LIGHTMAP_SPECULAR: the lightmap is
+//     untouched). The real spots hang ~1 m from the wall and ~4 m up, so their mirror image lands above the frame from any
+//     standing position; the virtual key light sits just in front of / above the painting, so the highlight is on the canvas
+//     and slides over it as you walk.
+// (2) Beams: a soft additive cone per spot, as long as the ray to the first wall/floor, plus motes that only show inside a beam.
+// Spot table = Blender light_spot_* [x, y, z, dirX, dirY, dirZ, cone angle in degrees] (Blender coords, converted with bl()).
+const SPOTS = [
+  [-2.42, -14.608, 5.601, -0.261, 0, -0.965, 38], [1.044, -14.716, 5.642, 0.519, 0, -0.855, 38], [2.013, -10.721, 5.63, 0.346, 0, -0.938, 38],
+  [-0.236, -10.527, 5.642, -0.628, 0, -0.778, 38], [-1.724, -10.671, 5.619, -0.404, 0, -0.915, 38], [-1.154, -14.526, 5.642, -0.502, 0, -0.865, 38],
+  [1.683, -18.669, 5.642, 0.41, 0, -0.912, 38], [2.654, -18.672, 5.639, 0.205, 0, -0.979, 38], [2.23, -14.608, 5.601, 0.303, 0, -0.953, 38],
+  [-2.319, -18.586, 5.619, -0.282, 0, -0.959, 38], [-1.298, -18.698, 5.642, -0.478, 0, -0.878, 38], [0.015, -18.694, 5.63, 0.654, 0, -0.756, 38],
+  [1.386, -1.357, 4.161, 0.505, 0, -0.863, 38], [-1.697, -3.662, 4.19, -0.423, 0, -0.906, 38], [-0.527, -3.867, 4.202, -0.662, 0, -0.75, 38],
+  [0.352, -3.856, 4.202, 0.687, 0, -0.727, 38], [-1.764, -1.357, 4.161, -0.409, 0, -0.913, 38], [-0.726, -1.468, 4.202, -0.63, 0, -0.776, 38],
+  [1.431, -3.712, 4.179, 0.492, 0, -0.871, 38], [0.67, -1.439, 4.202, 0.639, 0, -0.769, 38], [0.979, -10.569, 5.642, 0.529, 0, -0.848, 38],
+  [-1.241, -10.548, 5.642, -0.488, 0, -0.873, 38],
+  [-1.4, -18.8, 5.6, 0.164, -0.694, -0.701, 30], [1.4, -18.8, 5.6, -0.164, -0.694, -0.701, 30],      // hero pair
+  [0.05, -4.586, 4.184, 0, -0.458, -0.889, 42], [0.34, -10.489, 5.651, -0.053, 0.699, -0.713, 30],   // partition: entrance side, hall side
+  [-2, -19.2, 5.6, -0.057, -0.571, -0.819, 20], [2, -19.2, 5.6, 0.056, -0.562, -0.825, 20],          // sculpture pair
+];
+const BEAM = { on: false /* default state of the Beams button / B key */, colour: [1, 0.73, 0.45], strength: 0.09, maxLen: 8, motes: 450 };
+// out / above: virtual key light, metres in front of the painting / above its centre. cone: radians. Intensity: see the
+// glare test in WEB_GALLERY.md (30 = blown-out blob, ~8 = soft sheen).
+// jitterOut / jitterSide / jitterUp: total spread (m) of the per-painting random offset of that position.
+const PAINT = { specular: [1, 0.78, 0.55], intensity: 8, out: 0.9, above: 0.35, jitterOut: 0.4, jitterSide: 1.2, jitterUp: 0.4, cone: 1.8, relief: 0.6, reliefStrength: 1.5, reliefSize: 1024, clearCoat: 0.5, clearCoatRoughness: 0.2, canvasRoughness: 0.5 };
+
+// Normal map from the painting itself: luminance read as height, Sobel on the GPU (a ProceduralTexture rendered once, no readback).
+// glTF convention: +X right, +Y up in the image; image rows run along +v, so "up" is -v.
+BABYLON.Effect.ShadersStore.artReliefFragmentShader = `
+  precision highp float;
+  varying vec2 vUV;
+  uniform sampler2D src; uniform vec2 texel; uniform float strength;
+  float L(float dx, float dy) { return dot(texture2D(src, vUV + vec2(dx, dy) * texel).rgb, vec3(0.299, 0.587, 0.114)); }
+  void main() {
+    float tl = L(-1., -1.), t = L(0., -1.), tr = L(1., -1.), l = L(-1., 0.), r = L(1., 0.), bl = L(-1., 1.), b = L(0., 1.), br = L(1., 1.);
+    float dx = (tr + 2. * r + br) - (tl + 2. * l + bl);
+    float dv = (bl + 2. * b + br) - (tl + 2. * t + tr);
+    gl_FragColor = vec4(normalize(vec3(-dx * strength, dv * strength, 1.0)) * 0.5 + 0.5, 1.0);
+  }`;
+function reliefMap(albedo) {
+  const size = PAINT.reliefSize;
+  const p = new BABYLON.ProceduralTexture("relief_" + albedo.name, size, "artRelief", scene, null, true);
+  p.setTexture("src", albedo);
+  p.setVector2("texel", new BABYLON.Vector2(1 / size, 1 / size));
+  p.setFloat("strength", PAINT.reliefStrength);
+  p.refreshRate = 1;                                                                         // every frame until the painting texture has arrived, then once more and stop
+  const obs = scene.onBeforeRenderObservable.add(() => {
+    if (albedo.isReady() && p.isReady()) { p.refreshRate = 0; scene.onBeforeRenderObservable.remove(obs); }
+  });
+  return p;
+}
+
+function setupLightPlay(bl, art) {
+  const V = BABYLON.Vector3, o0 = bl(0, 0, 0);
+  const spots = SPOTS.map(([x, y, z, dx, dy, dz, deg]) => ({
+    pos: bl(x, y, z), dir: bl(dx, dy, dz).subtract(o0).normalize(), angle: (deg * Math.PI) / 180, len: BEAM.maxLen,
+  }));
+  const zPart = bl(0, -6.4, 0).z, zEnd = bl(0, -20, 0).z;
+
+  // ---- (1) paintings ----
+  const specLights = [], reliefs = [], canvasMats = [];
+  let idx = 0;
+  for (const [name, ms] of art) {
+    const min = new V(Infinity, Infinity, Infinity), max = min.scale(-1);
+    for (const m of ms) { m.computeWorldMatrix(true); const b = m.getBoundingInfo().boundingBox; min.minimizeInPlace(b.minimumWorld); max.maximizeInPlace(b.maximumWorld); }
+    const size = max.subtract(min), c = min.add(max).scale(0.5);
+    const n = size.x < size.z ? "x" : "z";
+    // side the painting faces: side walls look at the hall axis; on the z axis the partition faces both ways, the end wall faces the hall
+    const face = n === "x" ? Math.sign(-c.x) : c.z > zEnd ? -1 : Math.sign(c.z - zPart);
+    // Same light position on every painting would put the glare at the same spot on all of them: jitter it per painting (fixed seed).
+    const k = idx++, j = (s) => { const v = Math.sin((k + 1) * 78.233 + s * 12.9898) * 43758.5453; return v - Math.floor(v) - 0.5; };   // -0.5 .. 0.5
+    const w = n === "x" ? "z" : "x";
+    const pos = c.clone();
+    pos[n] += face * (PAINT.out + j(1) * PAINT.jitterOut);
+    pos[w] += j(2) * PAINT.jitterSide;
+    pos.y = c.y + PAINT.above + j(3) * PAINT.jitterUp;
+    const canvasMat = ms.find((m) => /primitive0$/.test(m.name))?.material;
+    if (canvasMat) {                                                                         // varnish: a thin glossy coat over the paint
+      canvasMats.push(canvasMat);
+      canvasMat.roughness = PAINT.canvasRoughness;
+      canvasMat.clearCoat.isEnabled = true;
+      canvasMat.clearCoat.intensity = PAINT.clearCoat;
+      canvasMat.clearCoat.roughness = PAINT.clearCoatRoughness;
+      if (PAINT.relief > 0 && canvasMat.albedoTexture) {                                     // brush ridges catch the light: relief from the colour image
+        const nm = reliefMap(canvasMat.albedoTexture);
+        nm.level = PAINT.relief;
+        reliefs.push(nm);
+        canvasMat.bumpTexture = nm;
+        canvasMat.clearCoat.bumpTexture = nm;                                                // the varnish follows the paint surface
+        canvasMat.invertNormalMapX = true;                                                   // glTF normal-map convention in this left-handed scene (what the glTF loader sets)
+      }
+    }
+    const l = new BABYLON.SpotLight("spec_" + name, pos, c.subtract(pos).normalize(), PAINT.cone, 1, scene);
+    // PBR takes the specular colour from the light's DIFFUSE colour; LIGHTMAP_SPECULAR then drops the diffuse part (the lightmap has it)
+    l.diffuse = l.specular = new BABYLON.Color3(...PAINT.specular);
+    l.lightmapMode = BABYLON.Light.LIGHTMAP_SPECULAR;
+    l.intensity = PAINT.intensity;
+    l.includedOnlyMeshes = ms.filter((m) => /primitive0$/.test(m.name));                    // canvas only: on the walnut frame it reads as metal
+    specLights.push(l);
+  }
+
+  // ---- (2) beams ----
+  const solid = (m) => (SOLID.includes(baseName(m.name)) && baseName(m.name) !== "gallery_window_glass") || /^art_\d/.test(baseName(m.name));
+  const mat = new BABYLON.ShaderMaterial("beam", scene, { vertexSource: `
+    precision highp float;
+    attribute vec3 position; attribute vec3 normal; attribute vec2 uv;
+    uniform mat4 world; uniform mat4 view; uniform mat4 worldViewProjection;
+    varying vec3 vN; varying vec3 vP; varying float vT;
+    void main() {
+      mat4 wv = view * world;
+      vP = (wv * vec4(position, 1.0)).xyz;
+      vN = mat3(wv) * normal;
+      vT = uv.y;                                       // 0 at the lamp .. 1 at the first surface
+      gl_Position = worldViewProjection * vec4(position, 1.0);
+    }`, fragmentSource: `
+    precision highp float;
+    varying vec3 vN; varying vec3 vP; varying float vT;
+    uniform vec3 tint; uniform float strength;
+    void main() {
+      float chord = pow(abs(dot(normalize(vN), normalize(-vP))), 1.4);   // thick through the middle, vanishing at the silhouette
+      float along = smoothstep(0.0, 0.1, vT) * (1.0 - 0.8 * smoothstep(0.5, 1.0, vT)) * (1.0 - 0.4 * vT);
+      float near = smoothstep(0.3, 1.5, length(vP));                       // no hard slice when the camera is inside / next to it
+      gl_FragColor = vec4(tint, strength * chord * along * near);
+    }` }, { attributes: ["position", "normal", "uv"], uniforms: ["world", "view", "worldViewProjection", "tint", "strength"] });
+  mat.setColor3("tint", new BABYLON.Color3(...BEAM.colour));
+  mat.setFloat("strength", BEAM.strength);
+  mat.alphaMode = BABYLON.Engine.ALPHA_ADD;
+  mat.backFaceCulling = false;
+  mat.disableDepthWrite = true;
+  mat.needAlphaBlending = () => true;
+
+  const beams = spots.map((s, i) => {
+    const hit = scene.pickWithRay(new BABYLON.Ray(s.pos.add(s.dir.scale(0.1)), s.dir, BEAM.maxLen), solid);
+    s.len = hit && hit.hit ? Math.min(BEAM.maxLen, hit.distance + 0.1) : BEAM.maxLen;
+    const R = s.len * Math.tan(s.angle / 2);
+    const cone = BABYLON.MeshBuilder.CreateCylinder("beam" + i, { height: s.len, diameterTop: 0, diameterBottom: 2 * R, tessellation: 32, cap: BABYLON.Mesh.NO_CAP }, scene);
+    const p = cone.getVerticesData(BABYLON.VertexBuffer.PositionKind), uv = [];
+    for (let k = 0; k < p.length; k += 3) uv.push(0, (s.len / 2 - p[k + 1]) / s.len);   // v along the beam, apex = 0
+    cone.setVerticesData(BABYLON.VertexBuffer.UVKind, uv);
+    cone.position = s.pos.add(s.dir.scale(s.len / 2));
+    cone.rotationQuaternion = BABYLON.Quaternion.FromUnitVectorsToRef(V.Up(), s.dir.scale(-1), new BABYLON.Quaternion());   // apex (+y) at the lamp
+    cone.material = mat;
+    cone.isPickable = false;
+    cone.alphaIndex = 10;
+    s.tanHalf = Math.tan(s.angle / 2);
+    return cone;
+  });
+
+  // ---- motes: only visible inside a beam (size scaled by how deep inside), re-spawned inside random beams ----
+  const ps = new BABYLON.ParticleSystem("beamDust", BEAM.motes, scene);
+  ps.particleTexture = dustTexture();
+  ps.emitter = V.Zero();
+  ps.createPointEmitter(new V(-1, -0.4, -1), new V(1, 0.6, 1));
+  ps.startPositionFunction = (wm, pos) => {
+    const s = spots[(Math.random() * spots.length) | 0];
+    const d = s.len * (0.08 + 0.85 * Math.random()), r = d * s.tanHalf * Math.sqrt(Math.random()) * 0.95, a = Math.random() * 2 * Math.PI;
+    const u = V.Cross(s.dir, Math.abs(s.dir.y) > 0.9 ? V.Right() : V.Up()).normalize(), v = V.Cross(s.dir, u);
+    pos.copyFrom(s.pos).addInPlace(s.dir.scale(d)).addInPlace(u.scale(Math.cos(a) * r)).addInPlace(v.scale(Math.sin(a) * r));
+  };
+  ps.minSize = 0.01; ps.maxSize = 0.026;
+  ps.minLifeTime = 8; ps.maxLifeTime = 16;
+  ps.emitRate = BEAM.motes / 12;
+  ps.minEmitPower = 0.03; ps.maxEmitPower = 0.08;
+  ps.updateSpeed = 0.016;
+  const flow = ps.updateFunction;
+  let t = 0;
+  ps.updateFunction = (list) => {
+    const r = scene.getAnimationRatio(), k = 1.1e-3 * r, damp = Math.pow(0.99, r);
+    t += 0.016 * r;
+    for (const p of list) {
+      const d = p.direction, q = p.position;
+      d.x += Math.sin(q.y * 2.1 + q.z * 1.3 + t * 0.7) * k;
+      d.y += Math.sin(q.z * 1.7 + q.x * 2.3 + t * 0.5) * k * 0.5;
+      d.z += Math.sin(q.x * 1.9 + q.y * 1.1 + t * 0.6) * k;
+      d.scaleInPlace(damp);
+      let inside = 0;                                                                     // 0 outside every beam .. 1 on a beam axis
+      for (const s of spots) {
+        const rx = q.x - s.pos.x, ry = q.y - s.pos.y, rz = q.z - s.pos.z;
+        const along = rx * s.dir.x + ry * s.dir.y + rz * s.dir.z;
+        if (along < 0.15 || along > s.len) continue;
+        const px = rx - s.dir.x * along, py = ry - s.dir.y * along, pz = rz - s.dir.z * along;
+        inside = Math.max(inside, 1 - Math.sqrt(px * px + py * py + pz * pz) / (along * s.tanHalf));
+      }
+      const f = Math.min(1, Math.max(0, inside) * 3);
+      const cd = V.Distance(q, scene.activeCamera.position), n = Math.min(1, Math.max(0, (cd - 0.5) / 1.2));   // no big blobs right in front of the lens
+      p.scale.x = p.scale.y = f * f * (3 - 2 * f) * n;
+    }
+    flow(list);
+  };
+  ps.color1 = new BABYLON.Color4(1, 0.9, 0.7, 0.95);
+  ps.color2 = new BABYLON.Color4(1, 0.8, 0.6, 0.7);
+  ps.colorDead = new BABYLON.Color4(1, 0.9, 0.8, 0);
+  ps.blendMode = BABYLON.ParticleSystem.BLENDMODE_ADD;
+  ps.preWarmCycles = 300; ps.preWarmStepOffset = 4;
+
+  const set = (on) => { beams.forEach((b) => b.setEnabled(on)); on ? ps.start() : ps.stop(); };
+  set(BEAM.on);
+  // Glare on/off: highlight lights + varnish + relief together (all plain uniforms, no recompile).
+  const setGlare = (on) => {
+    specLights.forEach((l) => { l.intensity = on ? PAINT.intensity : 0; });
+    reliefs.forEach((r) => { r.level = on ? PAINT.relief : 0; });
+    canvasMats.forEach((m) => { m.clearCoat.intensity = on ? PAINT.clearCoat : 0; });
+  };
+  return { specLights, beams, spots, mat, motes: ps, setBeams: set, setGlare };
+}
+
+// ---- Floor reflection: a realtime planar mirror in the polished floor ----------------------------------------------------
+// The floor only had the static hall probe, so nothing in it moved with you. A MirrorTexture (the scene rendered upside down
+// about the floor plane, mip-mapped so the floor's roughness texture blurs it, plus an adaptive blur by distance) is used as
+// the floor material's reflectionTexture; LightmapGloss already divides reflections by the lightmap, so it fits. Cost: one more
+// pass over the scene (floor, beams and particles excluded), halved with FLOOR.every = 2. Off = level 0 + no rendering (a
+// reflectionTexture swap would recompile the frozen floor material and make the floor vanish for a moment).
+const FLOOR = { level: 3, size: 1024, blur: 12, every: 1 };
+function setupFloorReflection() {
+  const floor = scene.getMeshByName("gallery_floor");
+  if (!floor || !floor.material) return { set() {} };
+  const mir = new BABYLON.MirrorTexture("floorMirror", FLOOR.size, scene, true, BABYLON.Constants.TEXTURETYPE_HALF_FLOAT);
+  mir.mirrorPlane = new BABYLON.Plane(0, -1, 0, floor.getBoundingInfo().boundingBox.maximumWorld.y);   // floor top
+  mir.renderList = scene.meshes.filter((m) => m !== floor && !/^beam/.test(m.name) && m.getTotalVertices() > 0);
+  mir.adaptiveBlurKernel = FLOOR.blur;
+  floor.material.reflectionTexture = mir;
+  const mat = floor.material;
+  const set = (on) => {
+    mir.level = on ? FLOOR.level : 0;
+    mir.refreshRate = on ? FLOOR.every : 0;
+    if (mat.isFrozen) { mat.unfreeze(); scene.onAfterRenderObservable.addOnce(() => mat.freeze()); }   // a frozen material keeps the old reflection level
+  };
+  return { mirror: mir, set };
+}
+
+// ---- Eye adaptation: exposure follows how bright the view is ---------------------------------------------------------------
+// A tiny HDR render of the scene from the walking camera (48x27, every few frames) is read back and reduced to one number: the
+// centre-weighted log-average luminance. The first reading (spawn view, the tuned look) is the reference; after that
+// exposure = base * (ref / L)^power, clamped, and eased with different speeds (the eye gets used to a bright view faster than
+// to a dark one). Always on (no UI; console: __g.eye.on = false freezes it). The readback is the only GPU stall: 48x27 floats.
+const ADAPT = { w: 48, h: 27, every: 8, power: 0.5, min: 0.7, max: 1.5, tauBright: 0.6, tauDark: 2.0 };
+function setupEyeAdaptation(cam, pipeline) {
+  const ip = pipeline.imageProcessing, base = ip.exposure;
+  const rtt = new BABYLON.RenderTargetTexture("lum", { width: ADAPT.w, height: ADAPT.h }, scene, false, true, BABYLON.Constants.TEXTURETYPE_HALF_FLOAT);
+  rtt.activeCamera = cam;
+  rtt.refreshRate = ADAPT.every;
+  rtt.renderList = scene.meshes.filter((m) => m.getTotalVertices() > 0 && !/^beam/.test(m.name));
+  rtt.clearColor = new BABYLON.Color4(0, 0, 0, 1);
+  scene.customRenderTargets.push(rtt);
+  const weights = [];
+  let wsum = 0;
+  for (let y = 0; y < ADAPT.h; y++) for (let x = 0; x < ADAPT.w; x++) {
+    const dx = (x + 0.5) / ADAPT.w - 0.5, dy = (y + 0.5) / ADAPT.h - 0.5, w = Math.exp(-(dx * dx + dy * dy) / 0.08);   // centre-weighted
+    weights.push(w); wsum += w;
+  }
+  const st = { on: true, lum: 0, ref: 0, target: base, exposure: base, busy: false };
+  const read = () => {
+    if (st.busy) return;
+    st.busy = true;
+    Promise.resolve(rtt.readPixels()).then((d) => {
+      st.busy = false;
+      if (!d) return;
+      let s = 0;
+      for (let i = 0, k = 0; k < weights.length; i += 4, k++) s += weights[k] * Math.log(0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2] + 1e-3);
+      st.lum = Math.exp(s / wsum);
+      if (!st.ref) st.ref = st.lum;                                                          // first reading = the tuned spawn view
+      st.target = base * Math.min(ADAPT.max, Math.max(ADAPT.min, Math.pow(st.ref / st.lum, ADAPT.power)));
+    }).catch(() => { st.busy = false; });
+  };
+  rtt.onAfterRenderObservable.add(read);
+  let t0 = performance.now();
+  scene.onBeforeRenderObservable.add(() => {
+    const now = performance.now(), dt = Math.min(0.1, (now - t0) / 1000);
+    t0 = now;
+    if (!st.on) return;
+    const tau = st.target < st.exposure ? ADAPT.tauBright : ADAPT.tauDark;
+    st.exposure += (st.target - st.exposure) * (1 - Math.exp(-dt / tau));
+    ip.exposure = st.exposure;
+  });
+  return st;
 }

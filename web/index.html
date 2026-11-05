@@ -21,8 +21,11 @@
   #cross { position:fixed; left:50%; top:50%; width:6px; height:6px; margin:-3px 0 0 -3px; border-radius:50%; pointer-events:none;
            background:rgba(255,255,255,.55); box-shadow:0 0 0 1px rgba(0,0,0,.35); transition:transform .15s, background .15s; }
   #cross.on { transform:scale(2.6); background:var(--accent); }
-  #mute { position:fixed; right:16px; bottom:16px; z-index:5; background:rgba(13,11,9,.55); color:var(--fg); border:1px solid #3a322a;
+  #mute, #beams, #glare, #floor { position:fixed; right:16px; bottom:16px; z-index:5; background:rgba(13,11,9,.55); color:var(--fg); border:1px solid #3a322a;
           border-radius:20px; padding:6px 14px; font:inherit; cursor:pointer; }
+  #beams { bottom:56px; }
+  #glare { bottom:96px; }
+  #floor { bottom:136px; }
 </style>
 </head>
 <body>
@@ -30,7 +33,9 @@
 
 <audio id="music" src="assets/audio/music.mp3" loop preload="auto"></audio>
 <button id="mute" type="button">&#9835; Music: on</button>
-
+<button id="beams" type="button">&#10022; Beams: off</button>
+<button id="glare" type="button">&#10023; Glare: on</button>
+<button id="floor" type="button">&#9672; Floor reflection: on</button>
 <div id="cross"></div>
 
 <div id="loading" class="overlay">
@@ -43,12 +48,12 @@
   <div>Click to start walking</div>
   <div><b>W A S D</b>: walk &nbsp;&middot;&nbsp; <b>&larr; &rarr; &uarr; &darr;</b> or <b>mouse</b>: look around</div>
   <div><b>Click</b> or <b>Enter</b> on a painting to glide up to it</div>
-  <small>Esc to release the cursor &middot; M to mute music</small>
+  <small>Esc to release the cursor &middot; M to mute music &middot; B light beams &middot; G painting glare &middot; R floor reflection</small>
 </div>
 
 <!-- Pinned release, not the nightly root. Self-host before production. -->
 <script src="https://cdn.babylonjs.com/v9.0.0/babylon.js"></script>
 <script src="https://cdn.babylonjs.com/v9.0.0/loaders/babylonjs.loaders.min.js"></script>
-<script src="src/main.js?v=1793870340"></script>
+<script src="src/main.js?v=1793874064"></script>
 </body>
 </html>
