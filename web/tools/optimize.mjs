@@ -16,9 +16,11 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-const RAW = path.join(root, "build/gallery.raw.glb");
-const LM_IN = path.join(root, "build/lightmaps");
-const OUT = path.join(root, "web/assets");
+const VARIANT = process.env.WG_VARIANT || "";             // "empty" -> build-empty/ -> web-empty/assets (gallery without paintings)
+const BUILD = path.join(root, VARIANT ? "build-" + VARIANT : "build");
+const RAW = path.join(BUILD, "gallery.raw.glb");
+const LM_IN = path.join(BUILD, "lightmaps");
+const OUT = path.join(root, VARIANT ? "web-" + VARIANT : "web", "assets");
 const LM_OUT = path.join(OUT, "lightmaps");
 fs.mkdirSync(LM_OUT, { recursive: true });
 
@@ -64,7 +66,7 @@ console.log("gallery.glb", mb(RAW), "->", mb(glb));
 
 // ---- environment probe (render_env.py): plain copy, Radiance HDR is already RLE-compressed (1024x512 = 1.6 MB) ----
 fs.mkdirSync(path.join(OUT, "env"), { recursive: true });
-fs.copyFileSync(path.join(root, "build/env/hall.hdr"), path.join(OUT, "env/hall.hdr"));
+fs.copyFileSync(path.join(BUILD, "env/hall.hdr"), path.join(OUT, "env/hall.hdr"));
 
 // ---- lightmaps (sRGB 8-bit, linear/scale encoded by bake_lightmaps.py) ----
 const manifest = JSON.parse(fs.readFileSync(path.join(LM_IN, "manifest.json"), "utf8"));
@@ -85,7 +87,7 @@ fs.writeFileSync(path.join(LM_OUT, "manifest.json"), JSON.stringify(manifest, nu
 console.log("lightmaps", (before / 1e6).toFixed(2), "MB ->", (after / 1e6).toFixed(2), "MB");
 
 // ---- painting normal maps (bake_art_normals.py): plain PNG -> WebP, loaded by main.js only when Glare is switched on ----
-const NORMALS_IN = path.join(root, "build/normals");
+const NORMALS_IN = path.join(BUILD, "normals");
 if (fs.existsSync(NORMALS_IN)) {
   const NORMALS_OUT = path.join(OUT, "normals");
   fs.mkdirSync(NORMALS_OUT, { recursive: true });

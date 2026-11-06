@@ -2,14 +2,16 @@
 #   blender -b WOOD-GALLERY_v10_video.blend -P web/tools/export_glb.py
 # Removes lights, cameras, empties and atmosphere objects in memory only.
 # The .blend is never saved, so the source file stays untouched.
-import bpy
+import bpy, os
+
+VARIANT = os.environ.get("WG_VARIANT", "")   # "empty" -> build-empty/
 
 DROP_TYPES = {"LIGHT", "CAMERA", "EMPTY"}
 for ob in list(bpy.data.objects):
     if ob.type in DROP_TYPES or ob.name.startswith("atmos_"):
         bpy.data.objects.remove(ob, do_unlink=True)
 
-out = bpy.path.abspath("//build/gallery.raw.glb")  # "//" = folder of the .blend; web/tools/optimize.mjs makes the shipped one
+out = bpy.path.abspath("//" + ("build-" + VARIANT if VARIANT else "build") + "/gallery.raw.glb")  # "//" = folder of the .blend; web/tools/optimize.mjs makes the shipped one
 bpy.ops.export_scene.gltf(
     filepath=out,
     export_format="GLB",

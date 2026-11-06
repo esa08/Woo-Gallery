@@ -148,6 +148,17 @@ Lalu ulangi langkah 2 dan 3. Objek baru didaftarkan di `DEFAULT_RES` (dan `ALBED
 
 **Objek/lampu baru dari scene sumber** (tanpa bake ulang semua): `blender -b WOOD-GALLERY_web.blend -P web/tools/sync_objects.py -- nama1,nama2` menyalin objek dari `v10_video.blend` ke copy web (material dipakai ulang berdasarkan nama; lampu masuk `Lighting`, mesh masuk `Gallery`). Lalu bake ulang **semua objek yang terkena cahaya baru** (dinding, lantai, trims, door frames, props di dekatnya), ekspor GLB, optimize. Contoh 2026-11-05 (lampu spot partisi `partition_spot_fixture_hall/ent` + `light_spot_part_hall/ent`): bake `gallery_walls,gallery_floor,gallery_trims,gallery_door_window_frames,art_03_frame,art_09_frame,table_top,plant_pot,plant_leaves` ±11 menit. Fixture hanya IBL (tanpa lightmap), seperti spot fixtures lain.
 
+**Varian galeri kosong (tanpa lukisan + label), path terpisah** via env `WG_VARIANT=empty`: semua script membaca/menulis `build-empty/`, `web-empty/assets/`, `WOOD-GALLERY_empty.blend` (default tanpa env = path lama). Bench, plinth, patung, meja, tanaman tetap ada. 2026-11-06, ±15 menit total:
+```
+blender -b --python-exit-code 1 WOOD-GALLERY_v10_video.blend -P web/tools/make_empty.py   # hapus art_* -> build-empty/empty_src.blend
+WG_VARIANT=empty blender -b build-empty/empty_src.blend -P web/tools/bake_lightmaps.py -- --samples 768 --albedo
+WG_VARIANT=empty blender -b WOOD-GALLERY_empty.blend -P web/tools/render_env.py
+WG_VARIANT=empty blender -b WOOD-GALLERY_empty.blend -P web/tools/export_glb.py
+cd web/tools && WG_VARIANT=empty node optimize.mjs
+```
+- Bake fresh harus dari file **lain** (`empty_src.blend`): `save_as` ke file yang sedang dibuka gagal di Windows ("Unable to make version backup").
+- `web-empty/index.html` memakai `../web/src/main.js` dan musik dari `../web/assets/audio` (tanpa duplikat); kode lukisan menemukan 0 `art_*` dan diam, tombol Glare disembunyikan. Jalankan lokal dari **root repo**: `npx serve . -l 3000` → `/web-empty/`. Pages: `/web-empty/` (workflow ikut menyalin `web/src` + audio ke `_site/web/`).
+
 ### Parameter bake
 - 768 spp, adaptive threshold 0.005, margin 8 px (extend), blur gaussian σ = 1 px yang hanya memakai texel ter-bake (normalized convolution, supaya padding hitam tidak bocor).
 - UV: Smart UV Project ke layer `UVMap.001` (diekspor sebagai `TEXCOORD_1`), margin 6 px, skala pulau proporsional ukuran 3D. Pemakaian atlas lantai 60%, dinding 34%, plafon 34% (UV2 bawaan GLB hanya memakai 7–10%).

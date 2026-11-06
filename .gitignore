@@ -4,3 +4,4 @@ build/
 node_modules/
 *.blend1
 WOOD-GALLERY_v0[1-9].blend
+build-empty/

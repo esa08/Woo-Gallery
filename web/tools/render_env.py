@@ -6,7 +6,9 @@
 import bpy, math, os
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-OUT = os.path.join(ROOT, "build", "env"); os.makedirs(OUT, exist_ok=True)
+VARIANT = os.environ.get("WG_VARIANT", "")   # "empty" -> build-empty/, web-empty/, WOOD-GALLERY_empty.blend (gallery without paintings)
+BUILD = os.path.join(ROOT, "build-" + VARIANT if VARIANT else "build")
+OUT = os.path.join(BUILD, "env"); os.makedirs(OUT, exist_ok=True)
 sc = bpy.context.scene
 
 for ob in list(bpy.data.objects):

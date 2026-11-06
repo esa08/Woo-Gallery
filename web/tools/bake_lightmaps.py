@@ -27,8 +27,10 @@ ap.add_argument("--albedo-samples", type=int, default=8)
 args = ap.parse_args(sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else [])
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))   # repo root
-OUT = os.path.join(ROOT, "build", "lightmaps")   # raw PNG; web/tools/optimize.mjs converts to web/assets/lightmaps
-WEB_BLEND = os.path.join(ROOT, "WOOD-GALLERY_web.blend")
+VARIANT = os.environ.get("WG_VARIANT", "")   # "empty" -> build-empty/, web-empty/, WOOD-GALLERY_empty.blend (gallery without paintings)
+BUILD = os.path.join(ROOT, "build-" + VARIANT if VARIANT else "build")
+OUT = os.path.join(BUILD, "lightmaps")   # raw PNG; web/tools/optimize.mjs converts to web/assets/lightmaps
+WEB_BLEND = os.path.join(ROOT, f"WOOD-GALLERY_{VARIANT or 'web'}.blend")
 os.makedirs(OUT, exist_ok=True)
 
 DEFAULT_RES = {

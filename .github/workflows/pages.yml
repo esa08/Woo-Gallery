@@ -19,6 +19,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: mkdir _site && cp -r web/index.html web/assets web/src _site/
+      # empty gallery at /web-empty/: it loads ../web/src/main.js and ../web/assets/audio, same layout as the repo
+      - run: mkdir -p _site/web/assets && cp -r web/src _site/web/ && cp -r web/assets/audio _site/web/assets/ && cp -r web-empty _site/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
