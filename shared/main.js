@@ -11,20 +11,13 @@ scene.skipPointerMovePicking = true;   // no picking in v1
 
 window.addEventListener("resize", () => engine.resize());
 
-// Meshes the camera must not walk through. Everything else stays non-colliding (ceiling, trims, fixtures).
-const SOLID = [
-  "gallery_floor", "gallery_walls", "gallery_window_glass", "gallery_door_window_frames",
-  "bench_seat", "bench_leg_1", "bench_leg_2",
-  "plinth_1", "plinth_2", "sculpture_marble", "sculpture_bronze_knot",
-  "table_top", "table_leg_1", "table_leg_2", "table_leg_3", "table_leg_4", "plant_pot",
-];
+// Per-gallery room constants: the "runtime" object of ../gallery.json, loaded at the top of main().
+// R.solid = meshes the camera must not walk through (everything else stays non-colliding: ceiling, trims, fixtures).
+let R;
 
 // Uniform light that "plays back" the lightmaps. Measured with a white lightmap + white albedo + tone mapping off:
 // PBR diffuse comes out at 0.95-0.98 per unit intensity on wall, floor and ceiling (Burley/energy conservation), so 1/0.97.
 const LM_LIGHT = 1.03;
-
-// Reflection probe (render_env.py): rendered from the middle of the hall volume, so the projection box is centred on it.
-const ENV = { probe: [0, -14.66, 3.86], box: [7, 7.72, 16] /* Babylon axes: x, up, along the hall */, rotationY: 0 };
 
 // Gloss for lightmapped materials. Babylon multiplies EVERYTHING by the lightmap when useLightmapAsShadowmap is on
 // (diffuse, IBL ambient, reflections). That is right for diffuse, wrong for reflections: a window reflected in the floor
@@ -75,13 +68,9 @@ class LightmapGloss extends BABYLON.MaterialPluginBase {
   }
 }
 
-// Hall dust box in Blender coords (GALLERY_SCENE.md section 8).
-const DUST = { x: [-3.2, 3.2], y: [-22.2, -6.9], z: [0.3, 6.6], count: 400 };
-
 // Loading bar. The work is staged (GLB -> reflections -> lightmaps -> shader compile) and every stage reports in, because
 // a GLB served with gzip has no Content-Length (lengthComputable = false) and the later stages block the main thread.
 // After each update we give the browser one paint (setTimeout fallback: rAF is paused in background tabs).
-const GLB_BYTES = 8.5e6;                                // size of assets/gallery.glb, only used when the server sends no length
 const bar = $("bar").firstElementChild;
 const setBar = (p, msg) => { bar.style.width = (Math.min(p, 1) * 100).toFixed(1) + "%"; if (msg) $("msg").textContent = msg; };
 const paint = () => new Promise((res) => { const t = setTimeout(res, 50); requestAnimationFrame(() => { clearTimeout(t); res(); }); });
@@ -89,8 +78,12 @@ const step = async (p, msg) => { setBar(p, msg); await paint(); };
 
 (async function main() {
   await step(0.02, "Downloading gallery…");
+  const cfg = await fetch("../gallery.json");
+  if (!cfg.ok) throw new Error("gallery.json " + cfg.status);
+  R = (await cfg.json()).runtime;
+  const glbBytes = R.glbBytes || 8.5e6;                 // size of assets/gallery.glb, only used when the server sends no length
   const result = await BABYLON.ImportMeshAsync("assets/gallery.glb", scene, {
-    onProgress: (e) => setBar(0.02 + 0.5 * Math.min(e.loaded / (e.lengthComputable ? e.total : GLB_BYTES), 1)),   // 2% .. 52%
+    onProgress: (e) => setBar(0.02 + 0.5 * Math.min(e.loaded / (e.lengthComputable ? e.total : glbBytes), 1)),   // 2% .. 52%
   });
   await step(0.55, "Preparing scene…");
   const root = result.meshes[0];                        // "__root__": carries the glTF handedness flip
@@ -152,7 +145,7 @@ const step = async (p, msg) => { setBar(p, msg); await paint(); };
   // ponytail: one-shot resolution drop, no tiers. Add SceneOptimizer / quality tiers if this is not enough.
   setTimeout(() => { if (engine.getFps() < 40) engine.setHardwareScalingLevel(1.5); }, 6000);
 
-  window.__g = { engine, scene, camera, pipeline, root, bl, baked, lights, env, focus, play, floorRefl, eye };   // handle for console checks
+  window.__g = { engine, scene, camera, pipeline, root, bl, baked, lights, env, focus, play, floorRefl, eye, R };   // handle for console checks
 })().catch((err) => {
   console.error(err);
   $("msg").textContent = "Failed to load: " + err.message;
@@ -162,7 +155,7 @@ function prepareMeshes(meshes) {
   for (const m of meshes) {
     m.isPickable = false;
     // Multi-material meshes arrive split as "<name>_primitiveN"; strip the suffix to match.
-    m.checkCollisions = SOLID.includes(baseName(m.name));
+    m.checkCollisions = R.solid.includes(baseName(m.name));
   }
   const sky = scene.getMeshByName("env_sky_dome");
   if (sky) {
@@ -239,11 +232,14 @@ async function applyLightmaps(onProgress = () => {}) {
 
 // HDR probe from the hall: reflections for everything, ambient for the few meshes that are not lightmapped
 // (spot fixtures, pendants, labels, metal legs, bronze knot). Box projection pins reflections to the hall walls.
+// R.env (optional): probe = render_env.py camera, the middle of the hall volume (the projection box is centred on it);
+// box in Babylon axes: x, up, along the hall.
 async function setupEnvironment(bl) {
+  if (!R.env) return null;
   const env = new BABYLON.HDRCubeTexture("assets/env/hall.hdr", scene, 256, false, true, false, true);
-  env.boundingBoxPosition = bl(...ENV.probe);
-  env.boundingBoxSize = new BABYLON.Vector3(...ENV.box);
-  env.rotationY = ENV.rotationY;
+  env.boundingBoxPosition = bl(...R.env.probe);
+  env.boundingBoxSize = new BABYLON.Vector3(...R.env.box);
+  env.rotationY = R.env.rotationY;
   scene.environmentTexture = env;
   scene.environmentIntensity = 1;
   await new Promise((res, rej) => { env.onLoadObservable.addOnce(res); setTimeout(() => res(), 8000); });
@@ -262,8 +258,8 @@ function setupLights(baked) {
 }
 
 function setupCamera(bl) {
-  const cam = new BABYLON.UniversalCamera("walk", bl(0, -7.4, 1.7), scene);   // = CAM_hero_hall: hall side of the partition, facing the hero painting
-  cam.setTarget(bl(0, -22.66, 1.6));
+  const cam = new BABYLON.UniversalCamera("walk", bl(...R.camera.pos), scene);   // start pose, Blender coords (Hokkaido: CAM_hero_hall)
+  cam.setTarget(bl(...R.camera.target));
   cam.fov = 0.8;                                        // ~24 mm lens on 16:9, same as the still cameras
   cam.minZ = 0.05;
   cam.maxZ = 120;                                       // sky dome radius ~37 m
@@ -292,15 +288,18 @@ function setupCamera(bl) {
 // wall dead-ends when the target is seen through a doorway at an angle. It follows a route instead: straight on the same side
 // of the partition, through the nearest doorway when the painting is on the other side. Everything else in the gallery is
 // below eye height (bench, plinths, table), so the camera passes over it.
-const DOORS = [-2.0, 2.0];                               // Blender x of the two partition doorway centres (openings 1.3..2.7 m, ray cast)
+// R.partition (optional; without it the glide is a straight line): doors = Blender x of the doorway centres (Hokkaido: openings
+// 1.3..2.7 m, ray cast); zone = Blender y of the two faces of the partition wall; gates = Blender y of the route gates
+// (entrance, doorway, hall; ~1.2 m before / after the wall faces).
 function setupPaintingFocus(cam, meshes, bl) {
-  const V = BABYLON.Vector3;
-  const zEnt = bl(0, -5.0, 0).z, zDoor = bl(0, -6.4, 0).z, zHall = bl(0, -7.9, 0).z;   // gates ~1.2 m before / after the wall faces
-  const zone = (p) => (p.z < bl(0, -6.0, 0).z ? 0 : p.z > bl(0, -6.8, 0).z ? 2 : 1);  // 0 entrance, 1 inside the partition, 2 hall
+  const V = BABYLON.Vector3, P = R.partition;
+  const [zEnt, zDoor, zHall] = P ? P.gates.map((y) => bl(0, y, 0).z) : [];
+  const zone = (p) => (p.z < bl(0, P.zone[0], 0).z ? 0 : p.z > bl(0, P.zone[1], 0).z ? 2 : 1);  // 0 entrance, 1 inside the partition, 2 hall
   function route(from, end) {
+    if (!P) return [from, end];
     const a = zone(from), b = zone(end);
     if (a === b) return [from, end];
-    const dx = DOORS.map((d) => bl(d, 0, 0).x).reduce((best, x) => (Math.abs(from.x - x) + Math.abs(end.x - x) < Math.abs(from.x - best) + Math.abs(end.x - best) ? x : best));
+    const dx = P.doors.map((d) => bl(d, 0, 0).x).reduce((best, x) => (Math.abs(from.x - x) + Math.abs(end.x - x) < Math.abs(from.x - best) + Math.abs(end.x - best) ? x : best));
     const gates = [zEnt, zDoor, zHall].map((z) => new V(dx, from.y, z));
     const idx = a < b ? [a === 0 ? 0 : 1, b] : [a === 2 ? 2 : 1, b === 0 ? 0 : 1];
     const nodes = [];
@@ -455,10 +454,12 @@ function dustTexture() {
   return tex;
 }
 
+// R.dust (optional): the dust box in Blender coords (x, y, z ranges), count = particles.
 function setupDust(bl) {
+  if (!R.dust) return;
   const tex = dustTexture();
-  const [x0, x1] = DUST.x, [y0, y1] = DUST.y, [z0, z1] = DUST.z;
-  const ps = new BABYLON.ParticleSystem("dust", DUST.count, scene);
+  const [x0, x1] = R.dust.x, [y0, y1] = R.dust.y, [z0, z1] = R.dust.z;
+  const ps = new BABYLON.ParticleSystem("dust", R.dust.count, scene);
   ps.particleTexture = tex;
   // Box is axis-aligned and symmetric around its center, so the Blender->Babylon axis swap is just (x, z, y).
   ps.emitter = bl((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
@@ -469,7 +470,7 @@ function setupDust(bl) {
   ps.createBoxEmitter(new BABYLON.Vector3(-1, -0.5, -1), new BABYLON.Vector3(1, 0.8, 1), half.scale(-1), half);
   ps.minSize = 0.008; ps.maxSize = 0.018;               // ~1-2 px at 10 m on 1080p; the Cycles motes are 4-9 mm
   ps.minLifeTime = 25; ps.maxLifeTime = 45;
-  ps.emitRate = DUST.count / 35;
+  ps.emitRate = R.dust.count / 35;
   ps.minEmitPower = 0.05; ps.maxEmitPower = 0.12;
   ps.updateSpeed = 0.016;
 
@@ -506,20 +507,7 @@ function setupDust(bl) {
 //     standing position; the virtual key light sits just in front of / above the painting, so the highlight is on the canvas
 //     and slides over it as you walk.
 // (2) Beams: a soft additive cone per spot, as long as the ray to the first wall/floor, plus motes that only show inside a beam.
-// Spot table = Blender light_spot_* [x, y, z, dirX, dirY, dirZ, cone angle in degrees] (Blender coords, converted with bl()).
-const SPOTS = [
-  [-2.42, -14.608, 5.601, -0.261, 0, -0.965, 38], [1.044, -14.716, 5.642, 0.519, 0, -0.855, 38], [2.013, -10.721, 5.63, 0.346, 0, -0.938, 38],
-  [-0.236, -10.527, 5.642, -0.628, 0, -0.778, 38], [-1.724, -10.671, 5.619, -0.404, 0, -0.915, 38], [-1.154, -14.526, 5.642, -0.502, 0, -0.865, 38],
-  [1.683, -18.669, 5.642, 0.41, 0, -0.912, 38], [2.654, -18.672, 5.639, 0.205, 0, -0.979, 38], [2.23, -14.608, 5.601, 0.303, 0, -0.953, 38],
-  [-2.319, -18.586, 5.619, -0.282, 0, -0.959, 38], [-1.298, -18.698, 5.642, -0.478, 0, -0.878, 38], [0.015, -18.694, 5.63, 0.654, 0, -0.756, 38],
-  [1.386, -1.357, 4.161, 0.505, 0, -0.863, 38], [-1.697, -3.662, 4.19, -0.423, 0, -0.906, 38], [-0.527, -3.867, 4.202, -0.662, 0, -0.75, 38],
-  [0.352, -3.856, 4.202, 0.687, 0, -0.727, 38], [-1.764, -1.357, 4.161, -0.409, 0, -0.913, 38], [-0.726, -1.468, 4.202, -0.63, 0, -0.776, 38],
-  [1.431, -3.712, 4.179, 0.492, 0, -0.871, 38], [0.67, -1.439, 4.202, 0.639, 0, -0.769, 38], [0.979, -10.569, 5.642, 0.529, 0, -0.848, 38],
-  [-1.241, -10.548, 5.642, -0.488, 0, -0.873, 38],
-  [-1.4, -18.8, 5.6, 0.164, -0.694, -0.701, 30], [1.4, -18.8, 5.6, -0.164, -0.694, -0.701, 30],      // hero pair
-  [0.05, -4.586, 4.184, 0, -0.458, -0.889, 42], [0.34, -10.489, 5.651, -0.053, 0.699, -0.713, 30],   // partition: entrance side, hall side
-  [-2, -19.2, 5.6, -0.057, -0.571, -0.819, 20], [2, -19.2, 5.6, 0.056, -0.562, -0.825, 20],          // sculpture pair
-];
+// R.spots (optional, none = no beams) = Blender light_spot_* rows [x, y, z, dirX, dirY, dirZ, cone angle in degrees] (Blender coords, converted with bl()).
 const BEAM = { on: false /* default state of the Beams button / B key */, colour: [1, 0.73, 0.45], strength: 0.09, maxLen: 8, motes: 450 };
 // out / above: virtual key light, metres in front of the painting / above its centre. cone: radians. Intensity: see the
 // glare test in WEB_GALLERY.md (30 = blown-out blob, ~8 = soft sheen).
@@ -528,10 +516,12 @@ const PAINT = { specular: [1, 0.78, 0.55], intensity: 8, out: 0.9, above: 0.35, 
 
 function setupLightPlay(bl, art) {
   const V = BABYLON.Vector3, o0 = bl(0, 0, 0);
-  const spots = SPOTS.map(([x, y, z, dx, dy, dz, deg]) => ({
+  const spots = (R.spots || []).map(([x, y, z, dx, dy, dz, deg]) => ({
     pos: bl(x, y, z), dir: bl(dx, dy, dz).subtract(o0).normalize(), angle: (deg * Math.PI) / 180, len: BEAM.maxLen,
   }));
-  const zPart = bl(0, -6.4, 0).z, zEnd = bl(0, -20, 0).z;
+  // partition.wallY / endY (Blender y): the partition wall and the end wall, to pick the side a painting faces. Without a
+  // partition every painting faces the start position of the camera.
+  const P = R.partition, zPart = P && bl(0, P.wallY, 0).z, zEnd = P && bl(0, P.endY, 0).z, cam0 = bl(...R.camera.pos);
 
   // ---- (1) paintings ----
   const specLights = [], reliefs = [], canvasMats = [];
@@ -542,7 +532,7 @@ function setupLightPlay(bl, art) {
     const size = max.subtract(min), c = min.add(max).scale(0.5);
     const n = size.x < size.z ? "x" : "z";
     // side the painting faces: side walls look at the hall axis; on the z axis the partition faces both ways, the end wall faces the hall
-    const face = n === "x" ? Math.sign(-c.x) : c.z > zEnd ? -1 : Math.sign(c.z - zPart);
+    const face = !P ? Math.sign(cam0[n] - c[n]) : n === "x" ? Math.sign(-c.x) : c.z > zEnd ? -1 : Math.sign(c.z - zPart);
     // Same light position on every painting would put the glare at the same spot on all of them: jitter it per painting (fixed seed).
     const k = idx++, j = (s) => { const v = Math.sin((k + 1) * 78.233 + s * 12.9898) * 43758.5453; return v - Math.floor(v) - 0.5; };   // -0.5 .. 0.5
     const w = n === "x" ? "z" : "x";
@@ -575,7 +565,7 @@ function setupLightPlay(bl, art) {
   }
 
   // ---- (2) beams ----
-  const solid = (m) => (SOLID.includes(baseName(m.name)) && baseName(m.name) !== "gallery_window_glass") || /^art_\d/.test(baseName(m.name));
+  const solid = (m) => (R.solid.includes(baseName(m.name)) && baseName(m.name) !== "gallery_window_glass") || /^art_\d/.test(baseName(m.name));
   const mat = new BABYLON.ShaderMaterial("beam", scene, { vertexSource: `
     precision highp float;
     attribute vec3 position; attribute vec3 normal; attribute vec2 uv;
@@ -607,8 +597,8 @@ function setupLightPlay(bl, art) {
   const beams = spots.map((s, i) => {
     const hit = scene.pickWithRay(new BABYLON.Ray(s.pos.add(s.dir.scale(0.1)), s.dir, BEAM.maxLen), solid);
     s.len = hit && hit.hit ? Math.min(BEAM.maxLen, hit.distance + 0.1) : BEAM.maxLen;
-    const R = s.len * Math.tan(s.angle / 2);
-    const cone = BABYLON.MeshBuilder.CreateCylinder("beam" + i, { height: s.len, diameterTop: 0, diameterBottom: 2 * R, tessellation: 32, cap: BABYLON.Mesh.NO_CAP }, scene);
+    const rad = s.len * Math.tan(s.angle / 2);
+    const cone = BABYLON.MeshBuilder.CreateCylinder("beam" + i, { height: s.len, diameterTop: 0, diameterBottom: 2 * rad, tessellation: 32, cap: BABYLON.Mesh.NO_CAP }, scene);
     const p = cone.getVerticesData(BABYLON.VertexBuffer.PositionKind), uv = [];
     for (let k = 0; k < p.length; k += 3) uv.push(0, (s.len / 2 - p[k + 1]) / s.len);   // v along the beam, apex = 0
     cone.setVerticesData(BABYLON.VertexBuffer.UVKind, uv);
@@ -668,7 +658,7 @@ function setupLightPlay(bl, art) {
   ps.blendMode = BABYLON.ParticleSystem.BLENDMODE_ADD;
   ps.preWarmCycles = 300; ps.preWarmStepOffset = 4;
 
-  const set = (on) => { beams.forEach((b) => b.setEnabled(on)); on ? ps.start() : ps.stop(); };
+  const set = (on) => { beams.forEach((b) => b.setEnabled(on)); on && spots.length ? ps.start() : ps.stop(); };   // no spots: nothing for the motes to sit in
   set(BEAM.on);
   // Glare on/off: highlight lights + varnish + relief together (all plain uniforms, no recompile).
   const setGlare = (on) => {
@@ -687,7 +677,7 @@ function setupLightPlay(bl, art) {
 // reflectionTexture swap would recompile the frozen floor material and make the floor vanish for a moment).
 const FLOOR = { level: 3, size: 1024, blur: 12, every: 1 };
 function setupFloorReflection() {
-  const floor = scene.getMeshByName("gallery_floor");
+  const floor = R.floor && scene.getMeshByName(R.floor);
   if (!floor || !floor.material) return { set() {} };
   const mir = new BABYLON.MirrorTexture("floorMirror", FLOOR.size, scene, true, BABYLON.Constants.TEXTURETYPE_HALF_FLOAT);
   mir.mirrorPlane = new BABYLON.Plane(0, -1, 0, floor.getBoundingInfo().boundingBox.maximumWorld.y);   // floor top
