@@ -102,6 +102,59 @@ def check_lighting(errors):
         errors.append("compositor has no Glare node")
 
 
+ART_PREFIX = "//../../hokkaido/art/crop/"
+ART_FRAMES = ["art_01_hero_frame"] + [f"art_{i:02d}_frame" for i in range(2, 10)]
+
+
+def canvas_normal(o):
+    """Area-weighted world normal of the faces using an art_* material."""
+    from mathutils import Vector
+    idx = {i for i, s in enumerate(o.material_slots) if s.material and s.material.name.startswith("art_")}
+    n = sum((p.normal * p.area for p in o.data.polygons if p.material_index in idx), Vector())
+    return (o.matrix_world.to_3x3() @ n).normalized()
+
+
+def check_content(errors):
+    import os
+    import re
+    frames = sorted(o.name for o in bpy.data.objects if re.fullmatch(r"art_\d\d(_hero)?_frame", o.name))
+    if frames != sorted(ART_FRAMES):
+        errors.append(f"art frames {frames}, want {ART_FRAMES}")
+    for n in frames:
+        o = bpy.data.objects[n]
+        mats = [s.material for s in o.material_slots if s.material and s.material.name.startswith("art_")]
+        imgs = [nd.image for m in mats for nd in m.node_tree.nodes if nd.type == "TEX_IMAGE" and nd.image]
+        if not imgs:
+            errors.append(f"{n}: no art_ material with an image")
+        for img in imgs:
+            # Blender on Windows stores "//..\\..\\" (Hokkaido too), so compare with "/" separators
+            if (not img.filepath.replace("\\", "/").startswith(ART_PREFIX)
+                    or not os.path.isfile(bpy.path.abspath(img.filepath))):
+                errors.append(f"{n}: image {img.filepath!r} not a valid {ART_PREFIX} link")
+        x, y = o.matrix_world.translation.x, o.matrix_world.translation.y
+        if not (-5 <= x <= 5 and -21.77 <= y <= -1.8):
+            errors.append(f"{n} at ({x:.2f}, {y:.2f}) is outside the hall")
+        for suffix in ("_label", "_label_txt"):
+            if n + suffix not in bpy.data.objects:
+                errors.append(f"missing {n + suffix}")
+    hero = bpy.data.objects.get("art_01_hero_frame")
+    if hero:
+        p = hero.matrix_world.translation
+        if abs(p.x) >= 0.1 or not -6.62 <= p.y <= -6.40:
+            errors.append(f"hero at ({p.x:.2f}, {p.y:.2f}), want front face of partition 1 (x~0, y -6.62..-6.40)")
+        if canvas_normal(hero).y < 0.95:
+            errors.append(f"hero canvas faces {tuple(round(c, 2) for c in canvas_normal(hero))}, want +Y")
+    content = bpy.data.collections["Gallery_Content"].objects
+    for n in ("plinth_1", "plinth_2", "sculpture_marble", "sculpture_bronze_knot"):
+        if n not in content:
+            errors.append(f"{n} not in Gallery_Content")
+    hall_bench = [o for o in content if o.name.startswith("bench_") and o.matrix_world.translation.y < -1.8]
+    if not hall_bench:
+        errors.append("no bench_* in the hall")
+    if not any(o.name.startswith("plant_") for o in content):
+        errors.append("no plant_* in Gallery_Content")
+
+
 def main():
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
     upto = argv[argv.index("--upto") + 1] if "--upto" in argv else STAGES[-1]
