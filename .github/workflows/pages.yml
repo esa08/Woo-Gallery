@@ -18,20 +18,13 @@ jobs:
       url: ${{ steps.d.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      # deploy only runtime: shared/ + per gallery gallery.json and variant folders (those with index.html); blend/, art/, build/, renders/ stay out
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      # runtime only (shared/, per gallery gallery.json + main.js/route.js/thumb.webp + variant folders) and the gallery
+      # picker at the root; blend/, art/, build/, renders/ stay out. Same script locally: node tools/build_site.mjs <dir>
       - name: Assemble site
-        run: |
-          mkdir _site
-          cp -r shared _site/
-          for g in galleries/*/; do
-            if [ ! -f "${g}gallery.json" ]; then continue; fi
-            mkdir -p "_site/$g"
-            cp "${g}gallery.json" "_site/$g"
-            for v in "$g"*/; do
-              if [ -f "${v}index.html" ]; then cp -r "$v" "_site/$g"; fi
-            done
-          done
-          echo '<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0; url=galleries/hokkaido/full/"><title>Woo Gallery</title>' > _site/index.html
+        run: node tools/build_site.mjs _site
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
