@@ -61,7 +61,7 @@
       "plant_pot"
     ],
     "floor": "gallery_floor",
-    "camera": { "pos": [0, -1.0, 1.6], "target": [0, -6.6, 1.6] },
+    "camera": { "pos": [0, -1.0, 1.6], "target": [0, -6.6, 2.3] },
     "env": { "probe": [0, -11.8, 2.4], "box": [10, 4.8, 20], "rotationY": 0 },
     "dust": { "x": [-4.8, 4.8], "y": [-21.5, -2.0], "z": [0.3, 4.4], "count": 400 },
     "spots": [

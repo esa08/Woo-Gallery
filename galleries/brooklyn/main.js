@@ -172,8 +172,43 @@ function prepareMeshes(meshes) {
     sky.material.backFaceCulling = false;               // camera sits inside the 75 m sphere
     sky.material.disableLighting = true;
     sky.applyFog = false;
+    blurSky(sky.material);
   }
   scene.collisionsEnabled = true;
+}
+
+// Brooklyn look, matched to galleries/brooklyn/renders/cam_main_hall.png (Cycles, AgX High Contrast):
+// fov = the 22 mm still camera; floor = the soft coat reflection of the render, not a mirror; wallBump = the 0.25 normal
+// strength of the Blender wall paint; skyPx = width the sky photo is shrunk to, so the trees read as the frosted blur seen
+// through the skylight (the render has rough glass + DOF; here a tiny texture magnified with bilinear filtering).
+const LOOK = { fov: 0.86, floorLevel: 0.6, floorBlur: 32, wallBump: 0.25, skyPx: 96, leatherRough: 0.7 };
+
+async function blurSky(mat) {
+  const tex = mat.emissiveTexture || mat.albedoTexture || mat.diffuseTexture;
+  if (!tex) return;
+  await new Promise((r) => (tex.isReady() ? r() : tex.onLoadObservable.addOnce(r)));
+  const { width: w, height: h } = tex.getSize(), src = await tex.readPixels();
+  if (!src) return;
+  const W = LOOK.skyPx, H = Math.max(1, Math.round((W * h) / w)), out = new Uint8Array(W * H * 4), fx = w / W, fy = h / H;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {          // box filter: average every source pixel of the cell
+    const acc = [0, 0, 0, 0];
+    let n = 0;
+    for (let sy = Math.floor(y * fy); sy < Math.floor((y + 1) * fy); sy++) for (let sx = Math.floor(x * fx); sx < Math.floor((x + 1) * fx); sx++) {
+      const i = (sy * w + sx) * 4;
+      for (let c = 0; c < 4; c++) acc[c] += src[i + c];
+      n++;
+    }
+    for (let c = 0; c < 4; c++) out[(y * W + x) * 4 + c] = acc[c] / n;
+  }
+  const small = new BABYLON.RawTexture(out, W, H, BABYLON.Constants.TEXTUREFORMAT_RGBA, scene, false, tex.invertY, BABYLON.Texture.BILINEAR_SAMPLINGMODE);
+  small.coordinatesIndex = tex.coordinatesIndex;
+  small.wrapU = tex.wrapU; small.wrapV = tex.wrapV;
+  const frozen = mat.isFrozen;                          // main() freezes all materials; this runs async and may land after
+  mat.unfreeze();
+  if (mat.emissiveTexture === tex) mat.emissiveTexture = small;
+  if (mat.albedoTexture === tex) mat.albedoTexture = small;
+  if (mat.diffuseTexture === tex) mat.diffuseTexture = small;
+  if (frozen) mat.freeze();
 }
 
 function prepareMaterials() {
@@ -181,6 +216,11 @@ function prepareMaterials() {
   // They are baked to albedo textures by bake_lightmaps.py --albedo and applied in applyLightmaps().
 
   // Transmission would render the whole scene again for refraction. Plain alpha for the prototype.
+  const leather = scene.getMaterialByName("leather_black");   // Brooklyn: IBL-only (no lightmap), reads wet unless rougher
+  if (leather) { leather.roughness = LOOK.leatherRough; leather.metallic = 0; if (leather.bumpTexture) leather.bumpTexture.level = 0.5; }
+  const wall = scene.getMaterialByName("wall_paint");
+  if (wall?.bumpTexture) wall.bumpTexture.level = LOOK.wallBump;   // Brooklyn: glTF drops the 0.25 strength -> grainy plaster
+
   const glass = scene.getMaterialByName("glass_gray_translucent");
   if (glass) {
     if (glass.subSurface) glass.subSurface.isRefractionEnabled = false;
@@ -270,7 +310,7 @@ function setupLights(baked) {
 function setupCamera(bl) {
   const cam = new BABYLON.UniversalCamera("walk", bl(...R.camera.pos), scene);   // start pose, Blender coords (Hokkaido: CAM_hero_hall)
   cam.setTarget(bl(...R.camera.target));
-  cam.fov = 0.8;                                        // ~24 mm lens on 16:9, same as the still cameras
+  cam.fov = LOOK.fov;                                   // Brooklyn: 22 mm still camera (vertical fov on 16:9)
   cam.minZ = 0.05;
   cam.maxZ = 120;                                       // sky dome radius ~37 m
   cam.speed = 0.1;                                      // measured: 0.4 -> 5.9 m/s at 60 fps, so 0.1 ~ 1.5 m/s (walking pace)
@@ -476,11 +516,13 @@ function setupPipeline(cam) {
   // AgX "Medium High Contrast" desaturates, Neutral does not, so saturation is pulled down by hand.
   // Grid search (4 x 3 x 3) on 8x6 cell luminance + saturation: best 1.4 / 1.2 / -30 (mean 0.416, sat 0.375, RGB .485/.405/.318).
   // Remaining cell error (~0.06) is structural (sensor shift_y of the Cycles camera, glossy floor), not a global parameter.
-  ip.exposure = 1.4;
-  ip.contrast = 1.2;
+  // Brooklyn: re-tuned against galleries/brooklyn/renders/cam_main_hall.png (lum 0.67, sat 0.233, RGB .724/.663/.580).
+  // Grid (headless Edge, eye adaptation frozen, after LOOK floor/sky/wall): 1.0 / 1.3 / -35 -> lum 0.671, sat ~0.23, RGB ~.729/.663/.578.
+  ip.exposure = 1.0;
+  ip.contrast = 1.3;
   ip.colorCurvesEnabled = true;
   ip.colorCurves = new BABYLON.ColorCurves();
-  ip.colorCurves.globalSaturation = -30;
+  ip.colorCurves.globalSaturation = -35;
   return p;
 }
 
@@ -718,7 +760,7 @@ function setupLightPlay(bl, art, blXY) {
 // the floor material's reflectionTexture; LightmapGloss already divides reflections by the lightmap, so it fits. Cost: one more
 // pass over the scene (floor, beams and particles excluded), halved with FLOOR.every = 2. Off = level 0 + no rendering (a
 // reflectionTexture swap would recompile the frozen floor material and make the floor vanish for a moment).
-const FLOOR = { level: 3, size: 1024, blur: 12, every: 1 };
+const FLOOR = { level: LOOK.floorLevel, size: 1024, blur: LOOK.floorBlur, every: 1 };   // Brooklyn: softer than Hokkaido (3 / 12)
 function setupFloorReflection() {
   const floor = R.floor && scene.getMeshByName(R.floor);
   if (!floor || !floor.material) return { set() {} };
