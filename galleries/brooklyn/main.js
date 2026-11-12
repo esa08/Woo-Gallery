@@ -172,8 +172,9 @@ function prepareMeshes(meshes) {
     sky.material.backFaceCulling = false;               // camera sits inside the 75 m sphere
     sky.material.disableLighting = true;
     sky.applyFog = false;
-    blurSky(sky.material);
+    blurSky(sky.material, LOOK.skyPx);                  // fallback only: the sky ceiling below covers the skylight view
   }
+  skyCeiling();
   scene.collisionsEnabled = true;
 }
 
@@ -181,15 +182,35 @@ function prepareMeshes(meshes) {
 // fov = the 22 mm still camera; floor = the soft coat reflection of the render, not a mirror; wallBump = the 0.25 normal
 // strength of the Blender wall paint; skyPx = width the sky photo is shrunk to, so the trees read as the frosted blur seen
 // through the skylight (the render has rough glass + DOF; here a tiny texture magnified with bilinear filtering).
-const LOOK = { fov: 0.86, floorLevel: 0.6, floorBlur: 32, wallBump: 0.25, skyPx: 96, leatherRough: 0.7 };
+const LOOK = { fov: 0.86, floorLevel: 0.4, floorBlur: 32, wallBump: 0.25, skyPx: 96, leatherRough: 0.7,
+  ceiling: { file: "sky_up.webp", z: 11, w: 40, h: 53, px: 320, level: 1.1 }, bloomWeight: 0.25, bloomThreshold: 1.15 };
 
-async function blurSky(mat) {
+// Brooklyn: what the skylight shows. The sky dome is an equirect photo: looking straight up lands on its pole, where the
+// photo pinches into a star. A flat "looking up" photo (trees + sky, generated) on a big plane above the roof has no pole.
+// Shrunk to ceiling.px wide so it reads slightly soft through the glass, like the frosted look of the Cycles render.
+function skyCeiling() {
+  const c = LOOK.ceiling, root = scene.getMeshByName("__root__");
+  const bl = (x, y, z) => BABYLON.Vector3.TransformCoordinates(new BABYLON.Vector3(x, z, -y), root.getWorldMatrix());
+  const plane = BABYLON.MeshBuilder.CreatePlane("sky_ceiling", { width: c.w, height: c.h }, scene);
+  plane.position = bl(0, -12, c.z);
+  plane.rotation.x = Math.PI / 2;                      // lie flat, long side (photo height) along the hall
+  const mat = new BABYLON.StandardMaterial("sky_ceiling", scene);
+  mat.disableLighting = true;
+  mat.backFaceCulling = false;
+  mat.emissiveTexture = new BABYLON.Texture(c.file, scene);
+  mat.emissiveTexture.level = c.level;
+  plane.material = mat;
+  plane.isPickable = false;
+  blurSky(mat, c.px);
+}
+
+async function blurSky(mat, px) {
   const tex = mat.emissiveTexture || mat.albedoTexture || mat.diffuseTexture;
   if (!tex) return;
   await new Promise((r) => (tex.isReady() ? r() : tex.onLoadObservable.addOnce(r)));
   const { width: w, height: h } = tex.getSize(), src = await tex.readPixels();
   if (!src) return;
-  const W = LOOK.skyPx, H = Math.max(1, Math.round((W * h) / w)), out = new Uint8Array(W * H * 4), fx = w / W, fy = h / H;
+  const W = px, H = Math.max(1, Math.round((W * h) / w)), out = new Uint8Array(W * H * 4), fx = w / W, fy = h / H;
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {          // box filter: average every source pixel of the cell
     const acc = [0, 0, 0, 0];
     let n = 0;
@@ -215,12 +236,15 @@ function prepareMaterials() {
   // Wall paint, oak and marble colours come from procedural nodes that the glTF export drops (colour falls back to white).
   // They are baked to albedo textures by bake_lightmaps.py --albedo and applied in applyLightmaps().
 
-  // Transmission would render the whole scene again for refraction. Plain alpha for the prototype.
   const leather = scene.getMaterialByName("leather_black");   // Brooklyn: IBL-only (no lightmap), reads wet unless rougher
-  if (leather) { leather.roughness = LOOK.leatherRough; leather.metallic = 0; if (leather.bumpTexture) leather.bumpTexture.level = 0.5; }
+  if (leather) {                                       // user: the corridor sofa reflection looked wrong -> no reflection at all
+    leather.roughness = LOOK.leatherRough; leather.metallic = 0; leather.environmentIntensity = 0; leather.metallicF0Factor = 0;
+    if (leather.bumpTexture) leather.bumpTexture.level = 0.5;
+  }
   const wall = scene.getMaterialByName("wall_paint");
   if (wall?.bumpTexture) wall.bumpTexture.level = LOOK.wallBump;   // Brooklyn: glTF drops the 0.25 strength -> grainy plaster
 
+  // Transmission would render the whole scene again for refraction. Plain alpha for the prototype.
   const glass = scene.getMaterialByName("glass_gray_translucent");
   if (glass) {
     if (glass.subSurface) glass.subSurface.isRefractionEnabled = false;
@@ -229,6 +253,7 @@ function prepareMaterials() {
     glass.backFaceCulling = false;
     glass.useRadianceOverAlpha = true;                  // reflections stay visible on a mostly transparent pane
     glass.useSpecularOverAlpha = true;
+    glass.environmentIntensity = 0.35;                 // Brooklyn: at grazing angles the pane read as a chrome mirror
   }
 }
 
@@ -503,8 +528,8 @@ function setupPipeline(cam) {
   p.samples = 4;                                        // MSAA: thin frames and trims stay clean
   p.fxaaEnabled = false;
   p.bloomEnabled = true;                                // soft, like the Blender Glare node (strength 0.35)
-  p.bloomThreshold = 1.0;
-  p.bloomWeight = 0.35;
+  p.bloomThreshold = LOOK.bloomThreshold;              // Brooklyn: white bench / plinths in the sun glowed too much
+  p.bloomWeight = LOOK.bloomWeight;
   p.bloomKernel = 64;
   p.bloomScale = 0.5;
   p.imageProcessingEnabled = true;
@@ -595,7 +620,7 @@ function setupDust(bl) {
 //     and slides over it as you walk.
 // (2) Beams: a soft additive cone per spot, as long as the ray to the first wall/floor, plus motes that only show inside a beam.
 // R.spots (optional, none = no beams) = Blender light_spot_* rows [x, y, z, dirX, dirY, dirZ, cone angle in degrees] (Blender coords, converted with bl()).
-const BEAM = { on: false /* default state of the Beams button / B key */, colour: [1, 0.73, 0.45], strength: 0.09, maxLen: 8, motes: 450 };
+const BEAM = { on: true /* Brooklyn: sun shafts on by default (B toggles) */, colour: [1, 0.94, 0.84], strength: 0.015, maxLen: 9, motes: 450 };
 // out / above: virtual key light, metres in front of the painting / above its centre. cone: radians. Intensity: see the
 // glare test in WEB_GALLERY.md (30 = blown-out blob, ~8 = soft sheen).
 // jitterOut / jitterSide / jitterUp: total spread (m) of the per-painting random offset of that position.
@@ -603,9 +628,6 @@ const PAINT = { specular: [1, 0.78, 0.55], intensity: 8, out: 0.9, above: 0.35, 
 
 function setupLightPlay(bl, art, blXY) {
   const V = BABYLON.Vector3, o0 = bl(0, 0, 0);
-  const spots = (R.spots || []).map(([x, y, z, dx, dy, dz, deg]) => ({
-    pos: bl(x, y, z), dir: bl(dx, dy, dz).subtract(o0).normalize(), angle: (deg * Math.PI) / 180, len: BEAM.maxLen,
-  }));
   const cam0 = bl(...R.camera.pos);
 
   // ---- (1) paintings ----
@@ -679,22 +701,35 @@ function setupLightPlay(bl, art, blXY) {
   mat.disableDepthWrite = true;
   mat.needAlphaBlending = () => true;
 
-  const beams = spots.map((s, i) => {
-    const hit = scene.pickWithRay(new BABYLON.Ray(s.pos.add(s.dir.scale(0.1)), s.dir, BEAM.maxLen), solid);
-    s.len = hit && hit.hit ? Math.min(BEAM.maxLen, hit.distance + 0.1) : BEAM.maxLen;
-    const rad = s.len * Math.tan(s.angle / 2);
-    const cone = BABYLON.MeshBuilder.CreateCylinder("beam" + i, { height: s.len, diameterTop: 0, diameterBottom: 2 * rad, tessellation: 32, cap: BABYLON.Mesh.NO_CAP }, scene);
-    const p = cone.getVerticesData(BABYLON.VertexBuffer.PositionKind), uv = [];
-    for (let k = 0; k < p.length; k += 3) uv.push(0, (s.len / 2 - p[k + 1]) / s.len);   // v along the beam, apex = 0
-    cone.setVerticesData(BABYLON.VertexBuffer.UVKind, uv);
-    cone.position = s.pos.add(s.dir.scale(s.len / 2));
-    cone.rotationQuaternion = BABYLON.Quaternion.FromUnitVectorsToRef(V.Up(), s.dir.scale(-1), new BABYLON.Quaternion());   // apex (+y) at the lamp
-    cone.material = mat;
-    cone.isPickable = false;
-    cone.alphaIndex = 10;
-    s.tanHalf = Math.tan(s.angle / 2);
-    return cone;
+  // Brooklyn: sunlight only (user: no beams from the lamps). R.shafts = { sun: [x, y, z] towards the sun (Blender, same as
+  // light_sun), glass: { x: [..], y: [..], z } skylight glass, step: grid spacing, radius }. A grid of thin parallel
+  // cylinders from the glass along the sun direction to the first solid surface; points whose way up to the sun is blocked
+  // by the skylight frame are dropped, so the mullions leave dark gaps between the shafts. Merged into one mesh.
+  const S = R.shafts, spots = [];
+  if (S) {
+    const dir = bl(-S.sun[0], -S.sun[1], -S.sun[2]).subtract(o0).normalize();
+    const frame = (m) => baseName(m.name) === "gallery_skylight_frame";
+    for (let x = S.glass.x[0]; x <= S.glass.x[1]; x += S.step) {
+      for (let y = S.glass.y[0]; y <= S.glass.y[1]; y += S.step) {
+        const pos = bl(x, y, S.glass.z);
+        if (scene.pickWithRay(new BABYLON.Ray(pos, dir.scale(-1), 1.5), frame)?.hit) continue;   // mullion in the way
+        const hit = scene.pickWithRay(new BABYLON.Ray(pos.add(dir.scale(0.05)), dir, BEAM.maxLen), solid);
+        spots.push({ pos, dir, radius: S.radius, len: hit?.hit ? Math.min(BEAM.maxLen, hit.distance + 0.05) : BEAM.maxLen });
+      }
+    }
+  }
+  const parts = spots.map((s, i) => {
+    const cyl = BABYLON.MeshBuilder.CreateCylinder("beam" + i, { height: s.len, diameter: 2 * s.radius, tessellation: 10, cap: BABYLON.Mesh.NO_CAP }, scene);
+    const p = cyl.getVerticesData(BABYLON.VertexBuffer.PositionKind), uv = [];
+    for (let k = 0; k < p.length; k += 3) uv.push(0, (s.len / 2 - p[k + 1]) / s.len);   // v along the shaft, glass = 0
+    cyl.setVerticesData(BABYLON.VertexBuffer.UVKind, uv);
+    cyl.position = s.pos.add(s.dir.scale(s.len / 2));
+    cyl.rotationQuaternion = BABYLON.Quaternion.FromUnitVectorsToRef(V.Up(), s.dir.scale(-1), new BABYLON.Quaternion());   // +y end at the glass
+    return cyl;
   });
+  const merged = parts.length ? BABYLON.Mesh.MergeMeshes(parts, true, true) : null;
+  if (merged) { merged.name = "beam_sun"; merged.material = mat; merged.isPickable = false; merged.alphaIndex = 10; }
+  const beams = merged ? [merged] : [];
 
   // ---- motes: only visible inside a beam (size scaled by how deep inside), re-spawned inside random beams ----
   const ps = new BABYLON.ParticleSystem("beamDust", BEAM.motes, scene);
@@ -703,7 +738,7 @@ function setupLightPlay(bl, art, blXY) {
   ps.createPointEmitter(new V(-1, -0.4, -1), new V(1, 0.6, 1));
   ps.startPositionFunction = (wm, pos) => {
     const s = spots[(Math.random() * spots.length) | 0];
-    const d = s.len * (0.08 + 0.85 * Math.random()), r = d * s.tanHalf * Math.sqrt(Math.random()) * 0.95, a = Math.random() * 2 * Math.PI;
+    const d = s.len * (0.08 + 0.85 * Math.random()), r = s.radius * Math.sqrt(Math.random()) * 0.95, a = Math.random() * 2 * Math.PI;
     const u = V.Cross(s.dir, Math.abs(s.dir.y) > 0.9 ? V.Right() : V.Up()).normalize(), v = V.Cross(s.dir, u);
     pos.copyFrom(s.pos).addInPlace(s.dir.scale(d)).addInPlace(u.scale(Math.cos(a) * r)).addInPlace(v.scale(Math.sin(a) * r));
   };
@@ -729,7 +764,7 @@ function setupLightPlay(bl, art, blXY) {
         const along = rx * s.dir.x + ry * s.dir.y + rz * s.dir.z;
         if (along < 0.15 || along > s.len) continue;
         const px = rx - s.dir.x * along, py = ry - s.dir.y * along, pz = rz - s.dir.z * along;
-        inside = Math.max(inside, 1 - Math.sqrt(px * px + py * py + pz * pz) / (along * s.tanHalf));
+        inside = Math.max(inside, 1 - Math.sqrt(px * px + py * py + pz * pz) / s.radius);
       }
       const f = Math.min(1, Math.max(0, inside) * 3);
       const cd = V.Distance(q, scene.activeCamera.position), n = Math.min(1, Math.max(0, (cd - 0.5) / 1.2));   // no big blobs right in front of the lens

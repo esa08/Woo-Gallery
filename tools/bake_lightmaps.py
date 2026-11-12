@@ -40,6 +40,9 @@ DEFAULT_RES = g.cfg["bake"]["res"]
 # Colour from procedural nodes (mix / noise / ramp) is lost on export: bake it. Walls = plaster mix + dirt near the floor,
 # bench / table = oak wave grain, marble = ramp veining. Lightmap UV, so no extra UV is needed.
 ALBEDO_RES = g.cfg["bake"]["albedo"]
+# Optional per-object blur sigma (px) overriding --blur, e.g. { "gallery_walls": 3 }: big flat walls show low-frequency
+# bake noise as blotches that 1 px does not hide (Brooklyn). Absent = --blur for every object (Hokkaido unchanged).
+BLUR = g.cfg["bake"].get("blur", {})
 
 targets = {n: max(64, int(r * args.res_scale)) for n, r in DEFAULT_RES.items()}
 if args.only:
@@ -160,7 +163,7 @@ def bake_light(ob, res):
     t0 = time.time()
     rgb = bake_pass(ob, res, {"DIRECT", "INDIRECT"}, args.samples)
     valid = rgb.max(axis=-1) > 0
-    rgb = gauss_blur(rgb, valid, args.blur)
+    rgb = gauss_blur(rgb, valid, BLUR.get(ob.name, args.blur))
     peak = rgb.max(axis=-1)
     p999 = float(np.percentile(peak[valid], 99.9)) if valid.any() else 1.0
     scale = max(1.0, math.ceil(p999 * 4) / 4)             # headroom factor, Babylon multiplies it back via texture.level
@@ -195,7 +198,9 @@ for name, res in targets.items():
             # fully metallic material (metal_black_satin, bronze_aged): no diffuse to bake, it is lit by reflections only.
             # A black lightmap would turn the object black in the browser, so it stays on the IBL path.
             print(f"BAKE skip {name}: zero diffuse (metallic), not added to the manifest")
-            manifest.pop(name, None); os.remove(os.path.join(OUT, name + ".png")); continue
+            manifest.pop(name, None); os.remove(os.path.join(OUT, name + ".png"))
+            ob.data.uv_layers.remove(ob.data.uv_layers[args.uv_layer])   # unused lightmap UV would only split vertices in the GLB
+            continue
         entry.update(st)
     if args.albedo and name in ALBEDO_RES:
         if "file" not in entry: prepare(ob, ALBEDO_RES[name])      # --no-light on a fresh object still needs the UV
