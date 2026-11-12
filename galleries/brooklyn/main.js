@@ -3,7 +3,8 @@
 // BROOKLYN FORK of shared/main.js (Hokkaido keeps the shared file). Differences, all marked "Brooklyn:":
 //   1. glide route goes round the three free-standing partitions (routeXY from ../route.js) instead of R.partition doorways;
 //   2. the side a painting faces comes from facingXY (route.js), not from Hokkaido's partition / end-wall guess;
-//   3. look constants tuned against galleries/brooklyn/renders/cam_main_hall.png.
+//   3. look constants tuned against galleries/brooklyn/renders/cam_main_hall.png;
+//   4. phone controls (setupTouch): drag up / down walks, sideways turns, tap a painting glides.
 "use strict";
 
 const $ = (id) => document.getElementById(id);
@@ -109,6 +110,7 @@ const step = async (p, msg) => { setBar(p, msg); await paint(); };
   // Brooklyn: Babylon point -> Blender [x, y] (inverse of bl), for route.js
   const blXY = (v) => { const p = BABYLON.Vector3.TransformCoordinates(v, root.getWorldMatrix().clone().invert()); return [p.x, -p.z]; };
   const focus = setupPaintingFocus(camera, result.meshes, bl, blXY);
+  setupTouch(camera, focus);
   const play = setupLightPlay(bl, focus.art, blXY);
   const floorRefl = setupFloorReflection();
   const eye = setupEyeAdaptation(camera, pipeline);
@@ -144,7 +146,8 @@ const step = async (p, msg) => { setBar(p, msg); await paint(); };
   engine.runRenderLoop(() => scene.render());
   $("loading").classList.add("hidden");
   $("hint").classList.remove("hidden");
-  $("hint").addEventListener("click", () => { music.play().catch(() => {}); engine.enterPointerlock(); canvas.focus(); $("hint").classList.add("hidden"); });
+  const phone = matchMedia("(pointer: coarse)").matches;   // Brooklyn: no pointer lock on phones (touch controls instead)
+  $("hint").addEventListener("click", () => { music.play().catch(() => {}); if (!phone) engine.enterPointerlock(); canvas.focus(); $("hint").classList.add("hidden"); });
   document.addEventListener("pointerlockchange", () => {
     if (!document.pointerLockElement) $("hint").classList.remove("hidden");
   });
@@ -333,10 +336,13 @@ function setupPaintingFocus(cam, meshes, bl, blXY) {
   const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));            // shortest turn
   let flight = null;
 
-  const pickAtCentre = () => {
-    const hit = scene.pick(canvas.clientWidth / 2, canvas.clientHeight / 2, (m) => m.isPickable);   // CSS pixels: pick() divides by the hardware scaling level (the 6 s fallback sets 1.5)
+  const pickAt = (x, y) => {
+    const hit = scene.pick(x, y, (m) => m.isPickable);   // CSS pixels: pick() divides by the hardware scaling level (the 6 s fallback sets 1.5)
     return hit.hit ? { name: baseName(hit.pickedMesh.name), normal: hit.getNormal(true) } : null;   // normal: world space, tells which side faces the room
   };
+  const pickAtCentre = () => pickAt(canvas.clientWidth / 2, canvas.clientHeight / 2);
+  // Brooklyn: touch tap on a painting (no pointer lock on phones, so pick where the finger lifted)
+  const tapAt = (x, y) => { const r = canvas.getBoundingClientRect(), p = pickAt(x - r.left, y - r.top); if (p) flyTo(p.name, p.normal); };
 
   function stop() {
     if (!flight) return;
@@ -415,7 +421,41 @@ function setupPaintingFocus(cam, meshes, bl, blXY) {
     last = now;
     dot.classList.toggle("on", !flight && engine.isPointerLock && !!pickAtCentre());
   });
-  return { flyTo, stop, art };
+  return { flyTo, stop, art, tapAt, isFlying: () => !!flight };
+}
+
+// Brooklyn: phone controls. One finger: drag up = walk forward, down = back (keeps walking while held, faster the further
+// the drag), left / right = turn. A tap (no drag) on a painting glides to it. Uses the camera's own collisions and gravity.
+const TOUCH = { turn: 0.006, walkFull: 110, tap: 12 };   // rad per px of sideways drag; px of drag for full walking speed; px still a tap
+function setupTouch(cam, focus) {
+  cam.inputs.removeByType("FreeCameraTouchInput");     // Babylon's own touch scheme would fight this one
+  if (cam.inputs.attached.mouse) cam.inputs.attached.mouse.touchEnabled = false;   // else a touch drag also looks around
+  let id = null, x0 = 0, y0 = 0, lastX = 0, walk = 0, moved = false;
+  canvas.addEventListener("pointerdown", (e) => {
+    if (e.pointerType !== "touch" || id !== null) return;
+    if (focus.isFlying()) focus.stop();
+    id = e.pointerId; x0 = lastX = e.clientX; y0 = e.clientY; walk = 0; moved = false;
+  });
+  canvas.addEventListener("pointermove", (e) => {
+    if (e.pointerId !== id) return;
+    cam.rotation.y += (e.clientX - lastX) * TOUCH.turn;
+    lastX = e.clientX;
+    walk = Math.max(-1, Math.min(1, (y0 - e.clientY) / TOUCH.walkFull));    // up = +1 forward
+    if (Math.hypot(e.clientX - x0, e.clientY - y0) > TOUCH.tap) moved = true;
+  });
+  const end = (e) => {
+    if (e.pointerId !== id) return;
+    id = null; walk = 0;
+    if (!moved && e.type === "pointerup") focus.tapAt(e.clientX, e.clientY);
+  };
+  canvas.addEventListener("pointerup", end);
+  canvas.addEventListener("pointercancel", end);
+  scene.onBeforeRenderObservable.add(() => {
+    if (!walk) return;
+    const f = cam.getDirection(BABYLON.Axis.Z);
+    f.y = 0;
+    cam.cameraDirection.addInPlace(f.normalize().scale(walk * cam.speed));   // same per-frame push as the W key
+  });
 }
 
 function setupPipeline(cam) {
