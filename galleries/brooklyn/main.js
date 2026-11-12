@@ -620,7 +620,7 @@ function setupDust(bl) {
 //     and slides over it as you walk.
 // (2) Beams: a soft additive cone per spot, as long as the ray to the first wall/floor, plus motes that only show inside a beam.
 // R.spots (optional, none = no beams) = Blender light_spot_* rows [x, y, z, dirX, dirY, dirZ, cone angle in degrees] (Blender coords, converted with bl()).
-const BEAM = { on: true /* Brooklyn: sun shafts on by default (B toggles) */, colour: [1, 0.94, 0.84], strength: 0.015, maxLen: 9, motes: 450 };
+const BEAM = { on: false /* sun shafts off by default (B toggles) */, colour: [1, 0.94, 0.84], strength: 0.015, maxLen: 9, motes: 450 };
 // out / above: virtual key light, metres in front of the painting / above its centre. cone: radians. Intensity: see the
 // glare test in WEB_GALLERY.md (30 = blown-out blob, ~8 = soft sheen).
 // jitterOut / jitterSide / jitterUp: total spread (m) of the per-painting random offset of that position.
