@@ -155,6 +155,38 @@ def check_content(errors):
         errors.append("no plant_* in Gallery_Content")
 
 
+def check_effects(errors):
+    dome = bpy.data.objects.get("env_sky_dome")
+    if not dome or dome.name not in bpy.data.collections["Environment"].objects:
+        errors.append("env_sky_dome not in Environment")
+    else:
+        imgs = [n.image.name for s in dome.material_slots if s.material
+                for n in s.material.node_tree.nodes if n.type == "TEX_IMAGE" and n.image]
+        if "tex_sky_dome_color" not in imgs:
+            errors.append(f"env_sky_dome images {imgs}, want tex_sky_dome_color")
+        want = {"visible_camera": True, "visible_transmission": True, "visible_shadow": False,
+                "visible_diffuse": False, "visible_glossy": False, "visible_volume_scatter": False}
+        bad = {k: getattr(dome, k) for k, v in want.items() if getattr(dome, k) != v}
+        if bad:   # a dome that casts shadows blocks the sun
+            errors.append(f"env_sky_dome ray visibility wrong: {bad}")
+    atm = bpy.data.collections["Atmosphere"].objects
+    errors += [f"{o.name} in Atmosphere lacks atmos_ prefix" for o in atm if not o.name.startswith("atmos_")]
+    box = bpy.data.objects.get("atmos_volume_box")
+    vol = box and next((n for s in box.material_slots if s.material
+                        for n in s.material.node_tree.nodes if n.type == "PRINCIPLED_VOLUME"), None)
+    if not vol or vol.inputs["Density"].default_value > 0.003:
+        errors.append("atmos_volume_box missing or Principled Volume density > 0.003")
+    dust = bpy.data.objects.get("atmos_dust_motes")
+    gn = dust and next((m for m in dust.modifiers if m.type == "NODES"), None)
+    if not gn:
+        errors.append("atmos_dust_motes missing or has no Geometry Nodes modifier")
+    else:
+        dg = bpy.context.evaluated_depsgraph_get()
+        n = sum(1 for i in dg.object_instances if i.is_instance and i.parent and i.parent.original == dust)
+        if n > 3000:
+            errors.append(f"atmos_dust_motes has {n} instances > 3000")
+
+
 def main():
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
     upto = argv[argv.index("--upto") + 1] if "--upto" in argv else STAGES[-1]
