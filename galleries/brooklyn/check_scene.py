@@ -63,6 +63,45 @@ def check_materials(errors):
                if i.packed_file and not i.name.startswith("tex_")]
 
 
+FIXTURES = ["gallery_spot_fixtures", "gallery_corridor_lamps"]
+
+
+def check_lighting(errors):
+    from mathutils.bvhtree import BVHTree
+    sc = bpy.context.scene
+    lights = [o for o in bpy.data.collections["Lighting"].objects if o.type == "LIGHT"]
+    suns = [o for o in lights if o.data.type == "SUN"]
+    if [o.name for o in suns] != ["light_sun"]:
+        errors.append(f"want exactly one SUN named light_sun, got {[o.name for o in suns]}")
+    heads, spots = sc.get("spot_heads", 0), sum(o.data.type == "SPOT" for o in lights)
+    if not heads or spots < heads:
+        errors.append(f"{spots} spots for {heads} spot heads")
+    import bmesh
+    trees = []
+    for n in FIXTURES:   # world-space trees: fixture objects are not at identity transform
+        if n in bpy.data.objects:
+            bm = bmesh.new()
+            bm.from_mesh(bpy.data.objects[n].data)
+            bm.transform(bpy.data.objects[n].matrix_world)
+            trees.append(BVHTree.FromBMesh(bm))
+            bm.free()
+    for o in lights:   # anti-goal: no light without a visible fixture
+        if o.data.type == "SUN":
+            continue
+        p = o.matrix_world.translation
+        dist = min((t.find_nearest(p)[3] for t in trees if t.find_nearest(p)[0] is not None), default=1e9)
+        if dist > 0.3:
+            errors.append(f"{o.name} is {dist:.2f} m from any fixture (hidden light)")
+    w = sc.world
+    if not (w and w.use_nodes and any(n.type == "TEX_SKY" for n in w.node_tree.nodes)):
+        errors.append("world has no Sky Texture")
+    if sc.render.engine != "CYCLES" or sc.view_settings.view_transform != "AgX":
+        errors.append(f"render {sc.render.engine}/{sc.view_settings.view_transform}, want CYCLES/AgX")
+    g = sc.compositing_node_group
+    if not (g and any(n.type == "GLARE" for n in g.nodes)):
+        errors.append("compositor has no Glare node")
+
+
 def main():
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
     upto = argv[argv.index("--upto") + 1] if "--upto" in argv else STAGES[-1]
