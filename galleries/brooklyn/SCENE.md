@@ -98,7 +98,7 @@ Rules: never add hidden or fill lights. `check_scene.py --upto lighting` fails a
 ## 7. Render and look
 Cycles GPU (OptiX), Light Tree, 384 spp, adaptive 0.01, denoise. Bounces: 8 total, diffuse 4, glossy 6, transmission 8, volume 1; indirect clamp 10. AgX, look **"AgX - High Contrast"**, exposure **-0.2**. Compositor group `comp_gallery`: Glare (Bloom, threshold 1.5, strength 0.35). Stills are 1920x1080. A 960x540 preview at 128 spp takes about 15-30 s.
 
-The look values (world 0.15, sun 14, spots 200 W, High Contrast, exposure -0.2, darker glossy floor) are "variant C", made after the user asked for a more realistic mood. They are not final approved values yet.
+The look values (world 0.15, sun 14, spots 200 W, High Contrast, exposure -0.2, darker glossy floor) are "variant C", made after the user asked for a more realistic mood. The user approved the v06 previews on 2026-11-12, so variant C is the approved look and the web bake source.
 
 ## 8. Atmosphere
 - `atmos_volume_box`: covers the hall, inset from the floor and walls (scale 9.9 x 19.85 x 4.76, centre (0, -11.79, 2.42)). Density 0.0028. **Never let a box face touch the floor**: coplanar faces made the floor see-through to the sky dome.
@@ -125,5 +125,5 @@ All are level (pitch 90°, roll 0). Framing uses Shift Y.
 
 ## 11. Status and open items
 - Done: cleanup and naming, materials, lighting, content, sky dome and atmosphere, cameras, final stills, empty variant, this document.
-- Open: the user asked for a "more realistic" mood, and variant C is the current answer. They have not confirmed it yet, and a reference photo was requested.
+- Look: variant C was approved by the user on 2026-11-12, together with the v06 previews and the final stills.
 - Not done (later stage): lightmap bake, GLB export, `gallery.json`, web page (WEB_GALLERY.md §3b).
