@@ -3,7 +3,7 @@
 #   WG_GALLERY=hokkaido blender -b galleries/hokkaido/blend/WOOD-GALLERY_v10_video.blend -P tools/bake_art_normals.py
 # Nothing is saved: the temporary image nodes live only in this background session, the .blend is never touched.
 # Output: galleries/<name>/build/<variant>/normals/<canvas material>.png (OpenGL / glTF convention: +X right, +Y up, 8-bit linear), same size as the painting.
-# tools/optimize.mjs converts them to <variant>/assets/normals/*.webp; main.js loads them the first time Glare is switched on.
+# tools/optimize.mjs converts them to <variant>/assets/normals/*.webp; main.js loads them at start.
 import bpy, os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from wg import gallery

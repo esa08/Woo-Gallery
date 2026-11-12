@@ -1,5 +1,6 @@
 # Render an equirectangular HDR probe from the middle of the hall, used by Babylon as the reflection / ambient environment.
-#   WG_GALLERY=hokkaido [WG_VARIANT=empty] blender -b galleries/hokkaido/blend/WOOD-GALLERY_v10_video.blend -P tools/render_env.py
+#   full:  WG_GALLERY=hokkaido blender -b galleries/hokkaido/blend/WOOD-GALLERY_v10_video.blend -P tools/render_env.py
+#   empty: WG_GALLERY=hokkaido WG_VARIANT=empty blender -b galleries/hokkaido/blend/WOOD-GALLERY_empty.blend -P tools/render_env.py
 # Output: galleries/<name>/build/<variant>/env/hall.hdr (Radiance RGBE, linear scene values: windows and lamps stay > 1, which is what reflections need).
 # Source file is never saved. Atmosphere (volume + dust motes) is removed in memory: dust specks would become bright
 # dots in every reflection. The compositor (Glare) is disabled so the file holds raw radiance.

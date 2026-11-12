@@ -1,5 +1,5 @@
 // Woo-Gallery walkthrough. Lighting = Cycles lightmaps (UV2) played back by one uniform light, reflections = an HDR probe
-// rendered from the hall, plus bloom and dust. Build pipeline: see the header of web/tools/optimize.mjs.
+// rendered from the hall, plus bloom and dust. Build pipeline: see the header of tools/optimize.mjs.
 "use strict";
 
 const $ = (id) => document.getElementById(id);
@@ -81,6 +81,7 @@ const step = async (p, msg) => { setBar(p, msg); await paint(); };
   const cfg = await fetch("../gallery.json");
   if (!cfg.ok) throw new Error("gallery.json " + cfg.status);
   R = (await cfg.json()).runtime;
+  if (!R?.solid || !R?.camera) throw new Error("gallery.json: runtime.solid and runtime.camera are required");
   const glbBytes = R.glbBytes || 8.5e6;                 // size of assets/gallery.glb, only used when the server sends no length
   const result = await BABYLON.ImportMeshAsync("assets/gallery.glb", scene, {
     onProgress: (e) => setBar(0.02 + 0.5 * Math.min(e.loaded / (e.lengthComputable ? e.total : glbBytes), 1)),   // 2% .. 52%
@@ -426,8 +427,8 @@ function setupPipeline(cam) {
   const ip = p.imageProcessing;                         // AgX does not exist in Babylon 9.0.0; Neutral is the closest honest match
   ip.toneMappingEnabled = true;
   ip.toneMappingType = BABYLON.ImageProcessingConfiguration.TONEMAPPING_KHR_PBR_NEUTRAL;
-  // Tuned against renders/hero_hall_v09_small.png = the approved pendant-light look (mean luminance 0.42, saturation 0.389,
-  // mean RGB 0.503/0.406/0.318). NOT cam_hero_hall.png: that still is the older, darker version (GALLERY_SCENE.md section 11).
+  // Tuned against galleries/hokkaido/renders/hero_hall_v09_small.png = the approved pendant-light look (mean luminance 0.42, saturation 0.389,
+  // mean RGB 0.503/0.406/0.318). NOT cam_hero_hall.png: that still is the older, darker version (galleries/hokkaido/SCENE.md section 11).
   // AgX "Medium High Contrast" desaturates, Neutral does not, so saturation is pulled down by hand.
   // Grid search (4 x 3 x 3) on 8x6 cell luminance + saturation: best 1.4 / 1.2 / -30 (mean 0.416, sat 0.375, RGB .485/.405/.318).
   // Remaining cell error (~0.06) is structural (sensor shift_y of the Cycles camera, glossy floor), not a global parameter.

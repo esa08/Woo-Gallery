@@ -11,5 +11,5 @@ for n in gone: bpy.data.objects.remove(bpy.data.objects[n], do_unlink=True)
 bpy.ops.outliner.orphans_purge(do_recursive=True)
 # bake source only; bake_lightmaps.py (WG_VARIANT=empty) saves the real copy as WOOD-GALLERY_empty.blend
 os.makedirs(g.build, exist_ok=True)
-bpy.ops.wm.save_as_mainfile(filepath=os.path.join(g.build, "empty_src.blend"))   # default relative_remap keeps the //../art paths valid from build/empty/
+bpy.ops.wm.save_as_mainfile(filepath=os.path.join(g.build, "empty_src.blend"))   # empty blends contain no painting images (all art_* objects and orphans purged)
 print("EMPTY removed", len(gone), gone)

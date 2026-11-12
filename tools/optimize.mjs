@@ -1,11 +1,17 @@
 // Build step: build/<variant>/gallery.raw.glb + lightmaps/*.png  ->  <variant>/assets/gallery.glb + lightmaps/*.webp
 //   cd tools && npm install && WG_GALLERY=hokkaido [WG_VARIANT=empty] node optimize.mjs
-// Full order (repo root; B = galleries/hokkaido/blend, add WG_VARIANT=empty for the gallery without paintings):
-//   1. WG_GALLERY=hokkaido blender -b B/WOOD-GALLERY_v10_video.blend -P tools/bake_lightmaps.py -- --samples 768   (writes B/WOOD-GALLERY_web.blend + build/full/lightmaps)
-//      (add --albedo for walls / bench / marble colour; later additions: -b B/WOOD-GALLERY_web.blend ... -- --in-place --only a,b)
-//   2. WG_GALLERY=hokkaido blender -b B/WOOD-GALLERY_web.blend -P tools/export_glb.py                              (writes build/full/gallery.raw.glb)
-//   2b. WG_GALLERY=hokkaido blender -b B/WOOD-GALLERY_v10_video.blend -P tools/render_env.py                       (writes build/full/env/hall.hdr)
-//   3. cd tools && WG_GALLERY=hokkaido node optimize.mjs                                                           (this file)
+// Full order (repo root; same commands as WEB_GALLERY.md section 3):
+//   1.  WG_GALLERY=hokkaido blender -b galleries/hokkaido/blend/WOOD-GALLERY_v10_video.blend -P tools/bake_lightmaps.py -- --samples 768 [--albedo]   (writes WOOD-GALLERY_web.blend + build/full/lightmaps)
+//       (later additions: blender -b galleries/hokkaido/blend/WOOD-GALLERY_web.blend ... -- --in-place --only a,b)
+//   2.  WG_GALLERY=hokkaido blender -b galleries/hokkaido/blend/WOOD-GALLERY_web.blend -P tools/export_glb.py   (writes build/full/gallery.raw.glb)
+//   2b. WG_GALLERY=hokkaido blender -b galleries/hokkaido/blend/WOOD-GALLERY_v10_video.blend -P tools/render_env.py   (writes build/full/env/hall.hdr)
+//   3.  cd tools && WG_GALLERY=hokkaido node optimize.mjs   (this file)
+// Empty order (gallery without paintings):
+//   1.  WG_GALLERY=hokkaido blender -b --python-exit-code 1 galleries/hokkaido/blend/WOOD-GALLERY_v10_video.blend -P tools/make_empty.py   (writes build/empty/empty_src.blend)
+//   2.  WG_GALLERY=hokkaido WG_VARIANT=empty blender -b galleries/hokkaido/build/empty/empty_src.blend -P tools/bake_lightmaps.py -- --samples 768 --albedo
+//   3.  WG_GALLERY=hokkaido WG_VARIANT=empty blender -b galleries/hokkaido/blend/WOOD-GALLERY_empty.blend -P tools/render_env.py
+//   4.  WG_GALLERY=hokkaido WG_VARIANT=empty blender -b galleries/hokkaido/blend/WOOD-GALLERY_empty.blend -P tools/export_glb.py
+//   5.  cd tools && WG_GALLERY=hokkaido WG_VARIANT=empty node optimize.mjs
 // Deploy galleries/<name>/<variant>/ (assets/ + index.html) only.
 // Everything shipped to the browser comes out of here; the raw Blender output stays in build/.
 import { NodeIO } from "@gltf-transform/core";

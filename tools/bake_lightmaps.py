@@ -6,7 +6,9 @@
 # Incremental run on the web copy (keeps the lightmap UV that already exists, merges into manifest.json):
 #   WG_GALLERY=hokkaido blender -b galleries/hokkaido/blend/WOOD-GALLERY_web.blend -P tools/bake_lightmaps.py -- --in-place --samples 768 --only a,b
 #   WG_GALLERY=hokkaido blender -b galleries/hokkaido/blend/WOOD-GALLERY_web.blend -P tools/bake_lightmaps.py -- --in-place --no-light --albedo --only gallery_walls
-# WG_VARIANT=empty bakes the gallery without paintings (WOOD-GALLERY_empty.blend, build/empty/). The source .blend is never touched.
+# WG_VARIANT=empty bakes the gallery without paintings (WOOD-GALLERY_empty.blend, build/empty/). Its fresh bake opens the make_empty.py output:
+#   WG_GALLERY=hokkaido WG_VARIANT=empty blender -b galleries/hokkaido/build/empty/empty_src.blend -P tools/bake_lightmaps.py -- --samples 768 --albedo
+# The source .blend is never touched.
 #
 # Output: galleries/<name>/build/<variant>/lightmaps/<object>.png (sRGB 8-bit, value = linear / scale), <object>_albedo.png, manifest.json.
 # In Babylon: lightmap texture.level = scale, coordinatesIndex = 1, invertY = false, useLightmapAsShadowmap = true;

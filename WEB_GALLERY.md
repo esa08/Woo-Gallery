@@ -202,7 +202,7 @@ $env:WG_GALLERY="hokkaido"; $env:WG_VARIANT="empty"; & $blender -b galleries/hok
 $env:WG_GALLERY="hokkaido"; $env:WG_VARIANT="empty"; & $blender -b galleries/hokkaido/blend/WOOD-GALLERY_empty.blend -P tools/export_glb.py
 cd tools; $env:WG_GALLERY="hokkaido"; $env:WG_VARIANT="empty"; node optimize.mjs; cd ..; Remove-Item Env:WG_VARIANT
 ```
-- Bake fresh harus dari file **lain** (`empty_src.blend`): `save_as` ke file yang sedang dibuka gagal di Windows ("Unable to make version backup"). `make_empty.py` menyimpannya di `build/empty/` dengan remap relatif, jadi path lukisan `//../art/crop/...` tetap valid dari situ.
+- Bake fresh harus dari file **lain** (`empty_src.blend`): `save_as` ke file yang sedang dibuka gagal di Windows ("Unable to make version backup"). `make_empty.py` menyimpannya di `build/empty/`; blend empty tidak berisi gambar lukisan (semua objek `art_*` dan gambar yatim dibuang).
 - `galleries/hokkaido/empty/index.html` memuat `../../../shared/main.js` dan musik dari `../../../shared/audio/music.mp3` (tanpa duplikat); kode lukisan menemukan 0 `art_*` dan diam, tombol Glare disembunyikan. Jalankan lokal dari **root repo**: `npx serve . -l 3000` → `/galleries/hokkaido/empty/`. Pages: `/galleries/hokkaido/empty/` (workflow menyalin `shared/` dan tiap subfolder gallery yang berisi `index.html`).
 
 Cek helper path: `blender -b --factory-startup --python-exit-code 1 -P tools/test_wg.py` (bash) atau `& $blender -b --factory-startup --python-exit-code 1 -P tools/test_wg.py` (PowerShell), harus mencetak `WG OK`.
@@ -225,6 +225,7 @@ Syarat: scene Blender yang sudah mengikuti aturan penamaan di bawah. Pipeline, r
    - `runtime` (koordinat dalam sumbu Blender, bukan Babylon):
      - **wajib**: `solid` (daftar mesh yang bertabrakan dengan kamera), `camera` (`{ "pos": [x,y,z], "target": [x,y,z] }`). Tanpa salah satunya runtime berhenti dengan pesan error.
      - opsional (tanpa field ini fiturnya mati, runtime tidak crash): `dust` tanpa → tanpa debu bergerak; `spots` tanpa → tanpa berkas cahaya (beams); `partition` (doors, zone, gates, wallY, endY) tanpa → glide ke lukisan lurus saja, tanpa routing lewat doorway; `floor` (nama mesh lantai) tanpa → tanpa pantulan lantai; `env` (`probe`, `box`, `rotationY`) tanpa → tanpa refleksi probe; `glbBytes` hanya fallback loading bar.
+   - `env` opsional hanya untuk runtime: tanpa `runtime.env`, lewati `render_env.py`; tetapi `optimize.mjs` tetap mengharapkan `build/<variant>/env/hall.hdr` (render dulu, atau tinggalkan `env` dengan sadar bahwa `optimize` gagal di langkah penyalinan itu).
    - `runtime.env.probe` dipakai `render_env.py` dan harus sama dengan yang dibaca runtime (satu sumber).
 3. **Aturan penamaan** (kode mengandalkannya; bukan koordinat atau daftar per ruangan, jadi tidak masuk config):
    - lukisan: objek `art_<nn>[_hero]_frame`, material kanvas berawalan `art_`; label ikut prefix `art_` (dipakai `make_empty.py`, `bake_art_normals.py`, runtime);
