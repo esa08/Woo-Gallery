@@ -1,7 +1,6 @@
-renders/
-build/
-.claude/
 node_modules/
+.claude/
 *.blend1
-WOOD-GALLERY_v0[1-9].blend
-build-empty/
+archive/
+galleries/*/build/
+galleries/*/renders/
