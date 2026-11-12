@@ -39,6 +39,7 @@
     "albedo": { "gallery_walls": 1024, "gallery_partitions": 512 }
   },
   "runtime": {
+    "glbBytes": 10637648,
     "solid": [
       "gallery_floor",
       "gallery_walls",

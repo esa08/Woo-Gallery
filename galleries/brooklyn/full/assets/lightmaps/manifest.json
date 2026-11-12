@@ -1,0 +1,198 @@
+{
+  "gallery_walls": {
+    "file": "lightmaps/gallery_walls.webp",
+    "scale": 4.5,
+    "res": 2048,
+    "mean": 0.6460267901420593,
+    "p999": 4.48537540435791,
+    "coverage": 0.8644156455993652,
+    "albedo": "lightmaps/gallery_walls_albedo.webp",
+    "albedoRes": 1024
+  },
+  "gallery_floor": {
+    "file": "lightmaps/gallery_floor.webp",
+    "scale": 6.5,
+    "res": 2048,
+    "mean": 1.501220464706421,
+    "p999": 6.427318572998047,
+    "coverage": 0.7834165096282959
+  },
+  "gallery_ceiling": {
+    "file": "lightmaps/gallery_ceiling.webp",
+    "scale": 7.25,
+    "res": 2048,
+    "mean": 0.821959912776947,
+    "p999": 7.117898941040039,
+    "coverage": 0.6208457946777344
+  },
+  "gallery_partitions": {
+    "file": "lightmaps/gallery_partitions.webp",
+    "scale": 4.75,
+    "res": 1024,
+    "mean": 0.6375634074211121,
+    "p999": 4.608066082000732,
+    "coverage": 0.8194208145141602,
+    "albedo": "lightmaps/gallery_partitions_albedo.webp",
+    "albedoRes": 512
+  },
+  "gallery_trims": {
+    "file": "lightmaps/gallery_trims.webp",
+    "scale": 1.5,
+    "res": 512,
+    "mean": 0.3582305610179901,
+    "p999": 1.4928405284881592,
+    "coverage": 0.09485244750976562
+  },
+  "gallery_doors": {
+    "file": "lightmaps/gallery_doors.webp",
+    "scale": 1,
+    "res": 512,
+    "mean": 0.2568781077861786,
+    "p999": 0.8432524800300598,
+    "coverage": 0.4356689453125
+  },
+  "art_01_hero_frame": {
+    "file": "lightmaps/art_01_hero_frame.webp",
+    "scale": 3.5,
+    "res": 512,
+    "mean": 0.5848624110221863,
+    "p999": 3.464477300643921,
+    "coverage": 0.6068344116210938
+  },
+  "art_02_frame": {
+    "file": "lightmaps/art_02_frame.webp",
+    "scale": 7.25,
+    "res": 256,
+    "mean": 0.6557654142379761,
+    "p999": 7.004306316375732,
+    "coverage": 0.9050445556640625
+  },
+  "art_03_frame": {
+    "file": "lightmaps/art_03_frame.webp",
+    "scale": 1.5,
+    "res": 256,
+    "mean": 0.3871265947818756,
+    "p999": 1.3826076984405518,
+    "coverage": 0.7548065185546875
+  },
+  "art_04_frame": {
+    "file": "lightmaps/art_04_frame.webp",
+    "scale": 6.75,
+    "res": 256,
+    "mean": 0.6880163550376892,
+    "p999": 6.62302303314209,
+    "coverage": 0.7322845458984375
+  },
+  "art_05_frame": {
+    "file": "lightmaps/art_05_frame.webp",
+    "scale": 6.75,
+    "res": 256,
+    "mean": 0.6696056127548218,
+    "p999": 6.515268802642822,
+    "coverage": 0.9170379638671875
+  },
+  "art_06_frame": {
+    "file": "lightmaps/art_06_frame.webp",
+    "scale": 6.5,
+    "res": 256,
+    "mean": 0.6734886169433594,
+    "p999": 6.397853374481201,
+    "coverage": 0.872772216796875
+  },
+  "art_07_frame": {
+    "file": "lightmaps/art_07_frame.webp",
+    "scale": 2,
+    "res": 256,
+    "mean": 0.4636773467063904,
+    "p999": 1.8459399938583374,
+    "coverage": 0.7734527587890625
+  },
+  "art_08_frame": {
+    "file": "lightmaps/art_08_frame.webp",
+    "scale": 6.75,
+    "res": 256,
+    "mean": 0.6333394050598145,
+    "p999": 6.584353923797607,
+    "coverage": 0.9059295654296875
+  },
+  "art_09_frame": {
+    "file": "lightmaps/art_09_frame.webp",
+    "scale": 1.5,
+    "res": 256,
+    "mean": 0.3859317898750305,
+    "p999": 1.401221513748169,
+    "coverage": 0.7605133056640625
+  },
+  "bench_seat": {
+    "file": "lightmaps/bench_seat.webp",
+    "scale": 5.75,
+    "res": 128,
+    "mean": 1.3480544090270996,
+    "p999": 5.574801445007324,
+    "coverage": 0.93341064453125
+  },
+  "bench_seat_2": {
+    "file": "lightmaps/bench_seat_2.webp",
+    "scale": 5.25,
+    "res": 128,
+    "mean": 1.1745704412460327,
+    "p999": 5.148766994476318,
+    "coverage": 0.93353271484375
+  },
+  "plinth_1": {
+    "file": "lightmaps/plinth_1.webp",
+    "scale": 1.5,
+    "res": 128,
+    "mean": 0.47389641404151917,
+    "p999": 1.2764133214950562,
+    "coverage": 0.77276611328125
+  },
+  "plinth_2": {
+    "file": "lightmaps/plinth_2.webp",
+    "scale": 1.25,
+    "res": 128,
+    "mean": 0.3492453098297119,
+    "p999": 1.060482144355774,
+    "coverage": 0.7730712890625
+  },
+  "sculpture_marble": {
+    "file": "lightmaps/sculpture_marble.webp",
+    "scale": 1.75,
+    "res": 128,
+    "mean": 0.6379057168960571,
+    "p999": 1.553387999534607,
+    "coverage": 0.737060546875
+  },
+  "plant_pot": {
+    "file": "lightmaps/plant_pot.webp",
+    "scale": 1,
+    "res": 128,
+    "mean": 0.24874746799468994,
+    "p999": 0.5813537240028381,
+    "coverage": 0.624755859375
+  },
+  "plant_leaves": {
+    "file": "lightmaps/plant_leaves.webp",
+    "scale": 1,
+    "res": 128,
+    "mean": 0.1108875423669815,
+    "p999": 0.5811253786087036,
+    "coverage": 0.66400146484375
+  },
+  "outlet_plate": {
+    "file": "lightmaps/outlet_plate.webp",
+    "scale": 3.75,
+    "res": 64,
+    "mean": 1.392073154449463,
+    "p999": 3.5102081298828125,
+    "coverage": 0.9306640625
+  },
+  "smoke_detector": {
+    "file": "lightmaps/smoke_detector.webp",
+    "scale": 1,
+    "res": 64,
+    "mean": 0.23866838216781616,
+    "p999": 0.59511399269104,
+    "coverage": 0.699462890625
+  }
+}
