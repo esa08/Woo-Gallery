@@ -1,26 +1,25 @@
-// Build step: build/gallery.raw.glb + build/lightmaps/*.png  ->  web/assets/gallery.glb + web/assets/lightmaps/*.webp
-//   cd web/tools && npm install && node optimize.mjs
-// Full order (repo root):
-//   1. blender -b WOOD-GALLERY_v10_video.blend -P web/tools/bake_lightmaps.py -- --samples 768   (writes WOOD-GALLERY_web.blend + build/lightmaps)
-//      (add --albedo for walls / bench / marble colour; later additions: -b WOOD-GALLERY_web.blend ... -- --in-place --only a,b)
-//   2. blender -b WOOD-GALLERY_web.blend -P web/tools/export_glb.py                              (writes build/gallery.raw.glb)
-//   2b. blender -b WOOD-GALLERY_v10_video.blend -P web/tools/render_env.py                       (writes build/env/hall.hdr)
-//   3. node web/tools/optimize.mjs                                                               (this file)
-// Deploy web/ without web/tools (node_modules lives there).
+// Build step: build/<variant>/gallery.raw.glb + lightmaps/*.png  ->  <variant>/assets/gallery.glb + lightmaps/*.webp
+//   cd tools && npm install && WG_GALLERY=hokkaido [WG_VARIANT=empty] node optimize.mjs
+// Full order (repo root; B = galleries/hokkaido/blend, add WG_VARIANT=empty for the gallery without paintings):
+//   1. WG_GALLERY=hokkaido blender -b B/WOOD-GALLERY_v10_video.blend -P tools/bake_lightmaps.py -- --samples 768   (writes B/WOOD-GALLERY_web.blend + build/full/lightmaps)
+//      (add --albedo for walls / bench / marble colour; later additions: -b B/WOOD-GALLERY_web.blend ... -- --in-place --only a,b)
+//   2. WG_GALLERY=hokkaido blender -b B/WOOD-GALLERY_web.blend -P tools/export_glb.py                              (writes build/full/gallery.raw.glb)
+//   2b. WG_GALLERY=hokkaido blender -b B/WOOD-GALLERY_v10_video.blend -P tools/render_env.py                       (writes build/full/env/hall.hdr)
+//   3. cd tools && WG_GALLERY=hokkaido node optimize.mjs                                                           (this file)
+// Deploy galleries/<name>/<variant>/ (assets/ + index.html) only.
 // Everything shipped to the browser comes out of here; the raw Blender output stays in build/.
 import { NodeIO } from "@gltf-transform/core";
 import { ALL_EXTENSIONS, EXTTextureWebP } from "@gltf-transform/extensions";
 import sharp from "sharp";
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { gallery } from "./wg.mjs";
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-const VARIANT = process.env.WG_VARIANT || "";             // "empty" -> build-empty/ -> web-empty/assets (gallery without paintings)
-const BUILD = path.join(root, VARIANT ? "build-" + VARIANT : "build");
+const g = gallery();
+const BUILD = g.build;
 const RAW = path.join(BUILD, "gallery.raw.glb");
 const LM_IN = path.join(BUILD, "lightmaps");
-const OUT = path.join(root, VARIANT ? "web-" + VARIANT : "web", "assets");
+const OUT = g.assets;
 const LM_OUT = path.join(OUT, "lightmaps");
 fs.mkdirSync(LM_OUT, { recursive: true });
 

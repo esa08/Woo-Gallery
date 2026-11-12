@@ -2,17 +2,19 @@
 # for materials whose colour comes from procedural nodes (those do not survive the glTF export).
 #
 # Fresh run (everything, re-packs every lightmap UV, re-saves WOOD-GALLERY_web.blend from the source file):
-#   blender -b WOOD-GALLERY_v10_video.blend -P web/tools/bake_lightmaps.py -- --samples 768
+#   WG_GALLERY=hokkaido blender -b galleries/hokkaido/blend/WOOD-GALLERY_v10_video.blend -P tools/bake_lightmaps.py -- --samples 768
 # Incremental run on the web copy (keeps the lightmap UV that already exists, merges into manifest.json):
-#   blender -b WOOD-GALLERY_web.blend -P web/tools/bake_lightmaps.py -- --in-place --samples 768 --only a,b
-#   blender -b WOOD-GALLERY_web.blend -P web/tools/bake_lightmaps.py -- --in-place --no-light --albedo --only gallery_walls
-# The source .blend is never touched.
+#   WG_GALLERY=hokkaido blender -b galleries/hokkaido/blend/WOOD-GALLERY_web.blend -P tools/bake_lightmaps.py -- --in-place --samples 768 --only a,b
+#   WG_GALLERY=hokkaido blender -b galleries/hokkaido/blend/WOOD-GALLERY_web.blend -P tools/bake_lightmaps.py -- --in-place --no-light --albedo --only gallery_walls
+# WG_VARIANT=empty bakes the gallery without paintings (WOOD-GALLERY_empty.blend, build/empty/). The source .blend is never touched.
 #
-# Output: build/lightmaps/<object>.png (sRGB 8-bit, value = linear / scale), <object>_albedo.png, manifest.json.
+# Output: galleries/<name>/build/<variant>/lightmaps/<object>.png (sRGB 8-bit, value = linear / scale), <object>_albedo.png, manifest.json.
 # In Babylon: lightmap texture.level = scale, coordinatesIndex = 1, invertY = false, useLightmapAsShadowmap = true;
 # albedo texture coordinatesIndex = 1, invertY = false.
 import bpy, sys, os, json, math, time, argparse
 import numpy as np
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from wg import gallery
 
 ap = argparse.ArgumentParser()
 ap.add_argument("--samples", type=int, default=64)
@@ -26,26 +28,16 @@ ap.add_argument("--albedo", action="store_true", help="also bake albedo for ALBE
 ap.add_argument("--albedo-samples", type=int, default=8)
 args = ap.parse_args(sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else [])
 
-ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))   # repo root
-VARIANT = os.environ.get("WG_VARIANT", "")   # "empty" -> build-empty/, web-empty/, WOOD-GALLERY_empty.blend (gallery without paintings)
-BUILD = os.path.join(ROOT, "build-" + VARIANT if VARIANT else "build")
-OUT = os.path.join(BUILD, "lightmaps")   # raw PNG; web/tools/optimize.mjs converts to web/assets/lightmaps
-WEB_BLEND = os.path.join(ROOT, f"WOOD-GALLERY_{VARIANT or 'web'}.blend")
+g = gallery()
+BUILD = g.build
+OUT = os.path.join(BUILD, "lightmaps")   # raw PNG; tools/optimize.mjs converts to <variant>/assets/lightmaps
+WEB_BLEND = g.blend
 os.makedirs(OUT, exist_ok=True)
 
-DEFAULT_RES = {
-    "gallery_walls": 2048, "gallery_floor": 2048, "gallery_ceiling": 2048,
-    "gallery_trims": 512, "gallery_door_window_frames": 512,
-    # props: small atlases, they only need the light level and soft shadows
-    "art_01_hero_frame": 512,
-    **{f"art_0{i}_frame": 256 for i in range(2, 10)},
-    "bench_seat": 128, "plinth_1": 128, "plinth_2": 128, "sculpture_marble": 128, "table_top": 128,
-    "bench_leg_1": 64, "bench_leg_2": 64, **{f"table_leg_{i}": 64 for i in range(1, 5)},
-    "plant_pot": 128, "plant_leaves": 128, "outlet_plate": 64, "smoke_detector": 64, "sculpture_bronze_knot": 128,
-}
+DEFAULT_RES = g.cfg["bake"]["res"]
 # Colour from procedural nodes (mix / noise / ramp) is lost on export: bake it. Walls = plaster mix + dirt near the floor,
 # bench / table = oak wave grain, marble = ramp veining. Lightmap UV, so no extra UV is needed.
-ALBEDO_RES = {"gallery_walls": 1024, "bench_seat": 256, "table_top": 256, "sculpture_marble": 256}
+ALBEDO_RES = g.cfg["bake"]["albedo"]
 
 targets = {n: max(64, int(r * args.res_scale)) for n, r in DEFAULT_RES.items()}
 if args.only:

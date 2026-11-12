@@ -1,11 +1,13 @@
 # Copy objects that were added to the source scene into WOOD-GALLERY_web.blend (the derived copy keeps its lightmap UVs,
 # so a full re-bake is not needed). Existing materials are reused by name. Lights go to "Lighting", the rest to "Gallery".
-#   blender -b WOOD-GALLERY_web.blend -P web/tools/sync_objects.py -- a,b,c
+#   WG_GALLERY=hokkaido blender -b galleries/hokkaido/blend/WOOD-GALLERY_web.blend -P tools/sync_objects.py -- a,b,c
 # Objects that already exist in the web copy are skipped. Saves the web copy.
 import bpy, sys, os, re
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from wg import gallery
 
 names = (sys.argv[sys.argv.index("--") + 1] if "--" in sys.argv else "").split(",")
-SRC = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "WOOD-GALLERY_v10_video.blend")
+SRC = gallery().source
 
 with bpy.data.libraries.load(SRC, link=False) as (src, dst):
     dst.objects = [n for n in names if n in src.objects and n not in bpy.data.objects]

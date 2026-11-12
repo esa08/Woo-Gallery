@@ -1,13 +1,14 @@
 # Bake the paint relief of every painting to a tangent-space normal map: the Bump node in the Blender material (luminance of the
 # painting as height, strength 0.6, distance 2 mm) does not survive the glTF export, so it is baked here.
-#   blender -b WOOD-GALLERY_v10_video.blend -P web/tools/bake_art_normals.py
+#   WG_GALLERY=hokkaido blender -b galleries/hokkaido/blend/WOOD-GALLERY_v10_video.blend -P tools/bake_art_normals.py
 # Nothing is saved: the temporary image nodes live only in this background session, the .blend is never touched.
-# Output: build/normals/<canvas material>.png (OpenGL / glTF convention: +X right, +Y up, 8-bit linear), same size as the painting.
-# web/tools/optimize.mjs converts them to web/assets/normals/*.webp; main.js loads them the first time Glare is switched on.
+# Output: galleries/<name>/build/<variant>/normals/<canvas material>.png (OpenGL / glTF convention: +X right, +Y up, 8-bit linear), same size as the painting.
+# tools/optimize.mjs converts them to <variant>/assets/normals/*.webp; main.js loads them the first time Glare is switched on.
 import bpy, os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from wg import gallery
 
-ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-OUT = os.path.join(ROOT, "build", "normals")
+OUT = os.path.join(gallery().build, "normals")
 os.makedirs(OUT, exist_ok=True)
 SAMPLES = 16                                                  # bump is deterministic, samples only anti-alias the texel footprint
 

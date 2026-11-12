@@ -1,14 +1,14 @@
 # Render an equirectangular HDR probe from the middle of the hall, used by Babylon as the reflection / ambient environment.
-#   blender -b WOOD-GALLERY_v10_video.blend -P web/tools/render_env.py
-# Output: build/env/hall.hdr (Radiance RGBE, linear scene values: windows and lamps stay > 1, which is what reflections need).
+#   WG_GALLERY=hokkaido [WG_VARIANT=empty] blender -b galleries/hokkaido/blend/WOOD-GALLERY_v10_video.blend -P tools/render_env.py
+# Output: galleries/<name>/build/<variant>/env/hall.hdr (Radiance RGBE, linear scene values: windows and lamps stay > 1, which is what reflections need).
 # Source file is never saved. Atmosphere (volume + dust motes) is removed in memory: dust specks would become bright
 # dots in every reflection. The compositor (Glare) is disabled so the file holds raw radiance.
-import bpy, math, os
+import bpy, math, os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from wg import gallery
 
-ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-VARIANT = os.environ.get("WG_VARIANT", "")   # "empty" -> build-empty/, web-empty/, WOOD-GALLERY_empty.blend (gallery without paintings)
-BUILD = os.path.join(ROOT, "build-" + VARIANT if VARIANT else "build")
-OUT = os.path.join(BUILD, "env"); os.makedirs(OUT, exist_ok=True)
+g = gallery()
+OUT = os.path.join(g.build, "env"); os.makedirs(OUT, exist_ok=True)
 sc = bpy.context.scene
 
 for ob in list(bpy.data.objects):
@@ -17,7 +17,7 @@ for ob in list(bpy.data.objects):
 
 # Probe at the centre of the hall volume (x 0, y -14.66 = middle of -6.66..-22.66, z 3.86 = middle of 0..7.72):
 # Babylon's box projection assumes the probe sits at the box centre.
-PROBE = (0.0, -14.66, 3.86)
+PROBE = tuple(g.cfg["runtime"]["env"]["probe"])
 cd = bpy.data.cameras.new("ENV_probe")
 cd.type = "PANO"
 if hasattr(cd, "panorama_type"): cd.panorama_type = "EQUIRECTANGULAR"
