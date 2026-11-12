@@ -5,8 +5,8 @@ Audience: AI agents and developers continuing this Blender scene. Values were re
 ## 0. TL;DR
 - Villume's "T-GALLERY" rebuilt in Blender 5.2 LTS (Cycles + OptiX): a T-shaped white gallery with a long skylight, 9 paintings, plinths with sculptures, benches, dust and haze.
 - Look target: same mood as Hokkaido (`../hokkaido/SCENE.md`), "realistic and natural". There are no hidden lights; every lamp sits in a visible fixture.
-- Current file: `blend/BROOKLYN_v07.blend` (with paintings) and `blend/BROOKLYN_v07_empty.blend` (same scene, all `art_*` removed). Older versions are in `archive/` at the repo root (git-ignored).
-- Check the conventions with `blender -b blend/BROOKLYN_v07.blend --python-exit-code 1 -P check_scene.py -- --upto cameras`, which must print `CHECK OK (cameras)`. For the empty variant use `--upto lighting`.
+- Current file: `blend/BROOKLYN_v08.blend` (with paintings; the web bake source) and `blend/BROOKLYN_v07_empty.blend` (v07 without `art_*`). Older versions are in `archive/` at the repo root (git-ignored).
+- Check the conventions with `blender -b blend/BROOKLYN_v08.blend --python-exit-code 1 -P check_scene.py -- --upto cameras`, which must print `CHECK OK (cameras)`. For the empty variant use `--upto lighting`.
 - Web (bake, GLB, `gallery.json`) is not done yet. The scene follows WEB_GALLERY.md §3b naming, so that pipeline should apply.
 
 ## 1. Paths and files
@@ -15,8 +15,8 @@ Paths are relative to `galleries/brooklyn/`.
 | Path | Content |
 |---|---|
 | `blend/T-GALLERY.glb` | Source model. From GitHub `GoThruMedia/villume-exhibitions`, `master`, `T-GALLERY/t-gallery-ori@default.glb`, 8 311 924 bytes. Do not modify |
-| `blend/BROOKLYN_v07.blend` | Current scene |
-| `blend/BROOKLYN_v07_empty.blend` | Derived: v06 without `art_*`. Re-derive it, don't edit it (snippet in §10) |
+| `blend/BROOKLYN_v08.blend` | Current scene = v07 + applied object scale on the 5 GLB objects (floor, ceiling, skylight frame, sprinklers, corridor lamps), which were at 0.01 / 0.145 and broke bake_lightmaps UV island sizing |
+| `blend/BROOKLYN_v07_empty.blend` | Derived: v07 without `art_*`. Re-derive it, don't edit it (snippet in §10) |
 | `check_scene.py` | Stage-by-stage convention check (`cleanup, materials, lighting, content, effects, cameras`) |
 | `render_still.py` | Headless still render of one camera (§10.5) |
 | `renders/` (git-ignored) | `cam_*.png` final stills (1920x1080, 384 spp) and `prev_v0N_*.png` previews |
@@ -120,8 +120,8 @@ All are level (pitch 90°, roll 0). Framing uses Shift Y.
 2. Appending a compositor node group can drag in the whole source scene through its Render Layers node. Repoint it to the current scene, then delete the appended scene.
 3. Appended objects show identity transforms until `view_layer.update()`.
 4. GLB meshes are split per face: weld before Decimate or Bevel, otherwise Decimate tears the mesh.
-5. `MCP execute_blender_code` times out at 120 s. Render stills headless with `render_still.py`, which sets OptiX, picks the camera and writes a 16-bit PNG. From the repo root: `blender -b galleries/brooklyn/blend/BROOKLYN_v07.blend -P galleries/brooklyn/render_still.py -- CAM_main_hall galleries/brooklyn/renders/cam_main_hall.png`.
-6. Empty variant from the current version: `blender -b blend/BROOKLYN_v07.blend --python-expr "import bpy; [bpy.data.objects.remove(o) for o in list(bpy.data.objects) if o.name.startswith('art_')]; bpy.data.orphans_purge(do_recursive=True); bpy.ops.wm.save_as_mainfile(filepath=bpy.path.abspath('//BROOKLYN_v07_empty.blend'), compress=True)"`.
+5. `MCP execute_blender_code` times out at 120 s. Render stills headless with `render_still.py`, which sets OptiX, picks the camera and writes a 16-bit PNG. From the repo root: `blender -b galleries/brooklyn/blend/BROOKLYN_v08.blend -P galleries/brooklyn/render_still.py -- CAM_main_hall galleries/brooklyn/renders/cam_main_hall.png`.
+6. Empty variant from the current version: `blender -b blend/BROOKLYN_v08.blend --python-expr "import bpy; [bpy.data.objects.remove(o) for o in list(bpy.data.objects) if o.name.startswith('art_')]; bpy.data.orphans_purge(do_recursive=True); bpy.ops.wm.save_as_mainfile(filepath=bpy.path.abspath('//BROOKLYN_v08_empty.blend'), compress=True)"`.
 
 ## 11. Status and open items
 - Done: cleanup and naming, materials, lighting, content, sky dome and atmosphere, cameras, final stills, empty variant, this document.

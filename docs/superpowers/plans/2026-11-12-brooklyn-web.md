@@ -69,8 +69,8 @@ The Pages assembly moves out of the workflow into `tools/build_site.mjs`, which 
 
 - [ ] **Step 1:** Run these headless, in order, one at a time:
   - `WG_GALLERY=brooklyn blender -b galleries/brooklyn/blend/BROOKLYN_web.blend -P tools/export_glb.py`
-  - `WG_GALLERY=brooklyn blender -b galleries/brooklyn/blend/BROOKLYN_v07.blend -P tools/render_env.py`
-  - `WG_GALLERY=brooklyn blender -b galleries/brooklyn/blend/BROOKLYN_v07.blend -P tools/bake_art_normals.py`
+  - `WG_GALLERY=brooklyn blender -b galleries/brooklyn/blend/BROOKLYN_v08.blend -P tools/render_env.py`
+  - `WG_GALLERY=brooklyn blender -b galleries/brooklyn/blend/BROOKLYN_v08.blend -P tools/bake_art_normals.py`
 
   Each must exit 0. After them, `build/full/` must contain `gallery.raw.glb`, `env/hall.hdr` and 9 `normals/*.png`.
 - [ ] **Step 2:** `cd tools && WG_GALLERY=brooklyn node optimize.mjs` → exit 0.
