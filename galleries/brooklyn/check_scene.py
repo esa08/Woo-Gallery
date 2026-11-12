@@ -187,6 +187,43 @@ def check_effects(errors):
             errors.append(f"atmos_dust_motes has {n} instances > 3000")
 
 
+CAMERAS = ["CAM_main_hall", "CAM_entrance", "CAM_artwork_detail"]
+
+
+def check_cameras(errors):
+    import math
+    sc = bpy.context.scene
+    cams = bpy.data.collections["Cameras"].objects
+    for n in CAMERAS:
+        c = cams.get(n)
+        if not c or c.type != "CAMERA":
+            errors.append(f"{n} missing from Cameras")
+            continue
+        pitch, roll = (math.degrees(a) for a in c.matrix_world.to_euler("XYZ")[:2])
+        if abs(pitch - 90) > 1 or abs(roll) > 1:   # level horizon, verticals straight (Hokkaido convention)
+            errors.append(f"{n} pitch {pitch:.1f} roll {roll:.1f}, want 90 / 0")
+    if not sc.camera or sc.camera.name != "CAM_main_hall":
+        errors.append(f"scene camera {sc.camera and sc.camera.name}, want CAM_main_hall")
+    main, hero = cams.get("CAM_main_hall"), bpy.data.objects.get("art_01_hero_frame")
+    if main and hero:
+        dg = bpy.context.evaluated_depsgraph_get()
+        o = main.matrix_world.translation
+        target = hero.matrix_world @ (sum((v.co for v in hero.data.vertices), hero.data.vertices[0].co * 0)
+                                      / len(hero.data.vertices))
+        d = (target - o).normalized()
+        while True:   # atmos_* volumes are not opaque surfaces, so look through them
+            hit, loc, _, _, obj, _ = sc.ray_cast(dg, o, d)
+            if not (hit and obj.name.startswith("atmos_")):
+                break
+            o = loc + d * 1e-3
+        if not hit or obj.name != "art_01_hero_frame":
+            errors.append(f"CAM_main_hall -> hero ray hits {obj.name if hit else None}, want art_01_hero_frame")
+    r = sc.render
+    if (r.resolution_x, r.resolution_y, r.resolution_percentage, sc.cycles.samples) != (1920, 1080, 100, 384):
+        errors.append(f"stills settings {r.resolution_x}x{r.resolution_y} {r.resolution_percentage}% "
+                      f"{sc.cycles.samples} spp, want 1920x1080 100% 384")
+
+
 def main():
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
     upto = argv[argv.index("--upto") + 1] if "--upto" in argv else STAGES[-1]
