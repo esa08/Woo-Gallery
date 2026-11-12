@@ -5,8 +5,8 @@ Audience: AI agents and developers continuing this Blender scene. Values were re
 ## 0. TL;DR
 - Villume's "T-GALLERY" rebuilt in Blender 5.2 LTS (Cycles + OptiX): a T-shaped white gallery with a long skylight, 9 paintings, plinths with sculptures, benches, dust and haze.
 - Look target: same mood as Hokkaido (`../hokkaido/SCENE.md`), "realistic and natural". There are no hidden lights; every lamp sits in a visible fixture.
-- Current file: `blend/BROOKLYN_v06.blend` (with paintings) and `blend/BROOKLYN_v06_empty.blend` (same scene, all `art_*` removed). Older versions are in `archive/` at the repo root (git-ignored).
-- Check the conventions with `blender -b blend/BROOKLYN_v06.blend --python-exit-code 1 -P check_scene.py -- --upto cameras`, which must print `CHECK OK (cameras)`. For the empty variant use `--upto lighting`.
+- Current file: `blend/BROOKLYN_v07.blend` (with paintings) and `blend/BROOKLYN_v07_empty.blend` (same scene, all `art_*` removed). Older versions are in `archive/` at the repo root (git-ignored).
+- Check the conventions with `blender -b blend/BROOKLYN_v07.blend --python-exit-code 1 -P check_scene.py -- --upto cameras`, which must print `CHECK OK (cameras)`. For the empty variant use `--upto lighting`.
 - Web (bake, GLB, `gallery.json`) is not done yet. The scene follows WEB_GALLERY.md §3b naming, so that pipeline should apply.
 
 ## 1. Paths and files
@@ -15,8 +15,8 @@ Paths are relative to `galleries/brooklyn/`.
 | Path | Content |
 |---|---|
 | `blend/T-GALLERY.glb` | Source model. From GitHub `GoThruMedia/villume-exhibitions`, `master`, `T-GALLERY/t-gallery-ori@default.glb`, 8 311 924 bytes. Do not modify |
-| `blend/BROOKLYN_v06.blend` | Current scene |
-| `blend/BROOKLYN_v06_empty.blend` | Derived: v06 without `art_*`. Re-derive it, don't edit it (snippet in §10) |
+| `blend/BROOKLYN_v07.blend` | Current scene |
+| `blend/BROOKLYN_v07_empty.blend` | Derived: v06 without `art_*`. Re-derive it, don't edit it (snippet in §10) |
 | `check_scene.py` | Stage-by-stage convention check (`cleanup, materials, lighting, content, effects, cameras`) |
 | `render_still.py` | Headless still render of one camera (§10.5) |
 | `renders/` (git-ignored) | `cam_*.png` final stills (1920x1080, 384 spp) and `prev_v0N_*.png` previews |
@@ -93,7 +93,7 @@ Appended from Hokkaido and retuned:
 
 World `world_sky`: Sky Texture (Multiple Scattering, sun disc off), Background **0.15**. Sky direction formula (measured): `dir = (sin r·cos e, cos r·cos e, sin e)`.
 
-Rules: never add hidden or fill lights. `check_scene.py --upto lighting` fails any non-sun light more than 0.3 m from a fixture mesh.
+Rules: never add hidden or fill lights. `check_scene.py --upto lighting` fails any non-sun light that is more than 0.3 m from a fixture mesh, or that aims more than 30° off the normal of the nearest lens. **When you re-aim a spot, swivel its head too.** v07 = v06 + every track head (housing + lens island of `gallery_spot_fixtures`) rotated about its stem joint to match its spot. Without that, 7 re-aimed spots shone sideways through their own housing, with 52-61% of the cone blocked.
 
 ## 7. Render and look
 Cycles GPU (OptiX), Light Tree, 384 spp, adaptive 0.01, denoise. Bounces: 8 total, diffuse 4, glossy 6, transmission 8, volume 1; indirect clamp 10. AgX, look **"AgX - High Contrast"**, exposure **-0.2**. Compositor group `comp_gallery`: Glare (Bloom, threshold 1.5, strength 0.35). Stills are 1920x1080. A 960x540 preview at 128 spp takes about 15-30 s.
@@ -120,10 +120,11 @@ All are level (pitch 90°, roll 0). Framing uses Shift Y.
 2. Appending a compositor node group can drag in the whole source scene through its Render Layers node. Repoint it to the current scene, then delete the appended scene.
 3. Appended objects show identity transforms until `view_layer.update()`.
 4. GLB meshes are split per face: weld before Decimate or Bevel, otherwise Decimate tears the mesh.
-5. `MCP execute_blender_code` times out at 120 s. Render stills headless with `render_still.py`, which sets OptiX, picks the camera and writes a 16-bit PNG. From the repo root: `blender -b galleries/brooklyn/blend/BROOKLYN_v06.blend -P galleries/brooklyn/render_still.py -- CAM_main_hall galleries/brooklyn/renders/cam_main_hall.png`.
-6. Empty variant from v06: `blender -b blend/BROOKLYN_v06.blend --python-expr "import bpy; [bpy.data.objects.remove(o) for o in list(bpy.data.objects) if o.name.startswith('art_')]; bpy.data.orphans_purge(do_recursive=True); bpy.ops.wm.save_as_mainfile(filepath=bpy.path.abspath('//BROOKLYN_v06_empty.blend'), compress=True)"`.
+5. `MCP execute_blender_code` times out at 120 s. Render stills headless with `render_still.py`, which sets OptiX, picks the camera and writes a 16-bit PNG. From the repo root: `blender -b galleries/brooklyn/blend/BROOKLYN_v07.blend -P galleries/brooklyn/render_still.py -- CAM_main_hall galleries/brooklyn/renders/cam_main_hall.png`.
+6. Empty variant from the current version: `blender -b blend/BROOKLYN_v07.blend --python-expr "import bpy; [bpy.data.objects.remove(o) for o in list(bpy.data.objects) if o.name.startswith('art_')]; bpy.data.orphans_purge(do_recursive=True); bpy.ops.wm.save_as_mainfile(filepath=bpy.path.abspath('//BROOKLYN_v07_empty.blend'), compress=True)"`.
 
 ## 11. Status and open items
 - Done: cleanup and naming, materials, lighting, content, sky dome and atmosphere, cameras, final stills, empty variant, this document.
-- Look: variant C was approved by the user on 2026-11-12, together with the v06 previews and the final stills.
+- Look: variant C was approved by the user on 2026-11-12, together with the v06 previews and the final stills. v07 only adds the head swivel fix, which makes the hero and the partition paintings brighter (`renders/prev_v07_*.png`). The `cam_*.png` stills are still from v06.
+- `check_scene.py` cleanup stage is for the source blend only: the bake adds a new `UVMap.001`, which that stage flags.
 - Not done (later stage): lightmap bake, GLB export, `gallery.json`, web page (WEB_GALLERY.md §3b).

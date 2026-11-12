@@ -20,7 +20,7 @@ The Pages assembly moves out of the workflow into `tools/build_site.mjs`, which 
 - **Hokkaido must not change.** No edits to `shared/main.js`, `galleries/hokkaido/**` (except adding `thumb.webp`), or Hokkaido URLs.
 - Brooklyn web ships the `full` variant only. No `galleries/brooklyn/empty/`.
 - The walkthrough experience is identical to Hokkaido: controls, music (`../../../shared/audio/music.mp3`), click-to-glide, effect buttons, loading bar, dust, beams. Only routing, facing and look tuning differ.
-- Bake source: `galleries/brooklyn/blend/BROOKLYN_v06.blend` (approved look, variant C). Never save over it.
+- Bake source: `galleries/brooklyn/blend/BROOKLYN_v07.blend` (approved look, variant C). Never save over it.
 - Run Blender jobs **headless and one at a time**, with the interactive Blender closed. Two Blender instances ran out of memory on 16 GB RAM.
 - No new npm dependencies. The picker is static HTML+CSS, follows the light/dark system theme, is one column on phones, and its cards are keyboard focusable.
 - Do not merge to `main` and do not `git push` without the user's explicit OK (the public URL changes and `/web-empty/` disappears).
@@ -46,7 +46,7 @@ The Pages assembly moves out of the workflow into `tools/build_site.mjs`, which 
 **Files:** Create `galleries/brooklyn/gallery.json`. Generated: `galleries/brooklyn/blend/BROOKLYN_web.blend`, `galleries/brooklyn/build/full/lightmaps/*`.
 
 **Interfaces:**
-- Produces: `gallery.json` with `title: "Brooklyn"`, `blend: {source: "blend/BROOKLYN_v06.blend", full: "blend/BROOKLYN_web.blend"}`, `bake: {res, albedo}`, and `runtime` with the fields below. Tasks 2-5 read it.
+- Produces: `gallery.json` with `title: "Brooklyn"`, `blend: {source: "blend/BROOKLYN_v07.blend", full: "blend/BROOKLYN_web.blend"}`, `bake: {res, albedo}`, and `runtime` with the fields below. Tasks 2-5 read it.
 
 - [ ] **Step 1: Write `gallery.json`.** It must be valid JSON. The `runtime` coordinates are in Blender space.
   - `bake.res`: gallery_walls 2048, gallery_floor 2048, gallery_ceiling 2048, gallery_partitions 1024, gallery_trims 512, gallery_doors 512, gallery_skylight_frame 512, art frames 256 (`art_01_hero_frame` 512), and 64-128 for every `bench_*`, `plinth_*`, `sculpture_*`, `plant_*`, `outlet_plate`, `smoke_detector`, `corridor_bench_*`.
@@ -56,10 +56,10 @@ The Pages assembly moves out of the workflow into `tools/build_site.mjs`, which 
   - `runtime.floor`: `"gallery_floor"`.
   - `runtime.env`: `{probe: [0, -11.8, 2.4], box: [10, 4.8, 20], rotationY: 0}`, where box is the Babylon (x, height, depth) size, as in Hokkaido.
   - `runtime.dust`: `{x: [-4.8, 4.8], y: [-21.5, -2.0], z: [0.3, 4.4], count: 400}`.
-  - `runtime.spots`: the 17 `light_spot_*`. Dump them with `blender -b galleries/brooklyn/blend/BROOKLYN_v06.blend --python-expr` printing `[x, y, z, dx, dy, dz, 38]` per spot (d = world -Z axis of the light, 3 decimals), and paste the result.
+  - `runtime.spots`: the 17 `light_spot_*`. Dump them with `blender -b galleries/brooklyn/blend/BROOKLYN_v07.blend --python-expr` printing `[x, y, z, dx, dy, dz, 38]` per spot (d = world -Z axis of the light, 3 decimals), and paste the result.
   - `runtime.glbBytes`: filled in Task 2.
 - [ ] **Step 2: Check the wiring.** Run `blender -b --factory-startup --python-exit-code 1 -P tools/test_wg.py` → `WG OK`. Then run `WG_GALLERY=brooklyn blender -b --factory-startup --python-expr "import sys;sys.path.insert(0,'tools');from wg import gallery;g=gallery();print('SRC',g.source,'FULL',g.blend)"` → it prints the v06 path and the `BROOKLYN_web.blend` path.
-- [ ] **Step 3: Fresh bake.** Run `WG_GALLERY=brooklyn blender -b galleries/brooklyn/blend/BROOKLYN_v06.blend -P tools/bake_lightmaps.py -- --samples 768 --albedo` in the background, with its log in the workspace. Expected: exit 0, `BROOKLYN_web.blend` written, and `build/full/lightmaps/manifest.json` lists every `bake.res` key. Verify with `node -e` reading both files, asserting that the key sets are equal and printing `BAKE OK`.
+- [ ] **Step 3: Fresh bake.** Run `WG_GALLERY=brooklyn blender -b galleries/brooklyn/blend/BROOKLYN_v07.blend -P tools/bake_lightmaps.py -- --samples 768 --albedo` in the background, with its log in the workspace. Expected: exit 0, `BROOKLYN_web.blend` written, and `build/full/lightmaps/manifest.json` lists every `bake.res` key. Verify with `node -e` reading both files, asserting that the key sets are equal and printing `BAKE OK`.
 - [ ] **Step 4:** Look at a contact sheet of the 4 biggest lightmaps (walls, floor, ceiling, partitions). There must be no black islands and no seams that stand out. Ledger any re-bake.
 - [ ] **Step 5:** Commit `gallery.json` and `BROOKLYN_web.blend`: `VA-21 Brooklyn web: gallery.json and lightmap bake`.
 
@@ -69,8 +69,8 @@ The Pages assembly moves out of the workflow into `tools/build_site.mjs`, which 
 
 - [ ] **Step 1:** Run these headless, in order, one at a time:
   - `WG_GALLERY=brooklyn blender -b galleries/brooklyn/blend/BROOKLYN_web.blend -P tools/export_glb.py`
-  - `WG_GALLERY=brooklyn blender -b galleries/brooklyn/blend/BROOKLYN_v06.blend -P tools/render_env.py`
-  - `WG_GALLERY=brooklyn blender -b galleries/brooklyn/blend/BROOKLYN_v06.blend -P tools/bake_art_normals.py`
+  - `WG_GALLERY=brooklyn blender -b galleries/brooklyn/blend/BROOKLYN_v07.blend -P tools/render_env.py`
+  - `WG_GALLERY=brooklyn blender -b galleries/brooklyn/blend/BROOKLYN_v07.blend -P tools/bake_art_normals.py`
 
   Each must exit 0. After them, `build/full/` must contain `gallery.raw.glb`, `env/hall.hdr` and 9 `normals/*.png`.
 - [ ] **Step 2:** `cd tools && WG_GALLERY=brooklyn node optimize.mjs` → exit 0.

@@ -1,7 +1,7 @@
 # Brooklyn gallery (sisi web) + halaman pilih gallery: design
 
 Tanggal: 2026-11-12. Issue: VA-21 (lanjutan). Status: draft, menunggu persetujuan user.
-Prasyarat: scene Blender Brooklyn selesai (`galleries/brooklyn/blend/BROOKLYN_v06.blend`, `galleries/brooklyn/SCENE.md`,
+Prasyarat: scene Blender Brooklyn selesai (`galleries/brooklyn/blend/BROOKLYN_v07.blend`, `galleries/brooklyn/SCENE.md`,
 spec `2026-11-12-brooklyn-blender-design.md`).
 
 ## 1. Kenapa
@@ -21,7 +21,7 @@ Goals:
 - Link langsung lama tetap jalan: `/galleries/hokkaido/full/`, `/galleries/hokkaido/empty/`.
 
 Non-goals:
-- Varian `empty` Brooklyn di web (keputusan user: versi berlukisan dulu). `BROOKLYN_v06_empty.blend` tetap ada untuk nanti.
+- Varian `empty` Brooklyn di web (keputusan user: versi berlukisan dulu). `BROOKLYN_v07_empty.blend` tetap ada untuk nanti.
 - Menggeneralisasi `shared/main.js` untuk semua ruangan.
 - Musik/kontrol khusus Brooklyn, kontrol sentuh mobile.
 - Push/deploy otomatis (lihat §6).
@@ -38,7 +38,7 @@ Anti-goals:
 - **Script runtime masing-masing**: Brooklyn punya runtime sendiri, Hokkaido tetap memakai `shared/main.js` apa adanya.
 - Web Brooklyn: hanya versi dengan lukisan untuk saat ini.
 - Pengalaman jalan-jalan di Brooklyn: **samakan dengan Hokkaido**.
-- Look Blender "varian C" di `BROOKLYN_v06.blend` sudah disetujui (preview v06 dan still final, 2026-11-12). Bake langsung
+- Look Blender "varian C" di `BROOKLYN_v07.blend` sudah disetujui (preview v06 dan still final, 2026-11-12). Bake langsung
   dari v06, tanpa gate look tambahan.
 
 ## 4. Rancangan
@@ -58,12 +58,12 @@ Anti-goals:
 
 ### 4.2 Pipeline (tool bersama, tidak diubah kecuali terbukti perlu)
 Urutan WEB_GALLERY.md §3b dengan `WG_GALLERY=brooklyn`:
-`bake_lightmaps.py` (fresh, dari `BROOKLYN_v06.blend` → `BROOKLYN_web.blend`) → `export_glb.py` → `render_env.py` →
+`bake_lightmaps.py` (fresh, dari `BROOKLYN_v07.blend` → `BROOKLYN_web.blend`) → `export_glb.py` → `render_env.py` →
 `bake_art_normals.py` → `optimize.mjs`. Render panjang dijalankan headless satu per satu (Blender interaktif ditutup:
 render berbarengan sempat kehabisan memori, 16 GB RAM).
 
 ### 4.3 `gallery.json` Brooklyn (koordinat Blender)
-- `title`: "Brooklyn". `blend`: `source` = `blend/BROOKLYN_v06.blend`, `full` = `blend/BROOKLYN_web.blend`.
+- `title`: "Brooklyn". `blend`: `source` = `blend/BROOKLYN_v07.blend`, `full` = `blend/BROOKLYN_web.blend`.
 - `bake.res`: resolusi per objek mengikuti kepadatan Hokkaido (dinding/lantai/plafon 2048, partisi ~1024, trims dan
   pintu 512, frame lukisan 256 (hero 512), props 64-128); `bake.albedo` minimal `gallery_walls`. Angka persis = builder,
   dengan target ukuran aset sekitar Hokkaido (±11 MB di disk).

@@ -92,6 +92,28 @@ def check_lighting(errors):
         dist = min((t.find_nearest(p)[3] for t in trees if t.find_nearest(p)[0] is not None), default=1e9)
         if dist > 0.3:
             errors.append(f"{o.name} is {dist:.2f} m from any fixture (hidden light)")
+    # a light must shine out of its lens, not sideways through its own housing
+    import math
+    from mathutils import Vector
+    lens = []
+    for n in FIXTURES:
+        o = bpy.data.objects.get(n)
+        if not o:
+            continue
+        idx = {i for i, s in enumerate(o.material_slots) if s.material and s.material.name == "lamp_emissive"}
+        m3 = o.matrix_world.to_3x3()
+        lens += [(o.matrix_world @ p.center, (m3 @ p.normal).normalized() * p.area)
+                 for p in o.data.polygons if p.material_index in idx]
+    for o in lights:
+        if o.data.type == "SUN":
+            continue
+        p = o.matrix_world.translation
+        nrm = sum((wn for c, wn in lens if (c - p).length < 0.3), Vector())
+        d = o.matrix_world.to_3x3() @ Vector((0, 0, -1))
+        if nrm.length == 0:
+            errors.append(f"{o.name} has no lens within 30 cm")
+        elif math.degrees(d.angle(nrm)) > 30:
+            errors.append(f"{o.name} aims {math.degrees(d.angle(nrm)):.0f} deg off its lens normal")
     w = sc.world
     if not (w and w.use_nodes and any(n.type == "TEX_SKY" for n in w.node_tree.nodes)):
         errors.append("world has no Sky Texture")
