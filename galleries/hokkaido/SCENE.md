@@ -6,18 +6,20 @@ Audience: AI agents working on this Blender scene. Data was read from the live s
 - Interior of a modern wooden art gallery: front room (entrance) -> partition with 2 doorways -> long hall with a high wooden ceiling and clerestory windows.
 - Origin: imported from `WOOD-GALLERY.glb` (a web-configurator export). It was cleaned, lit, textured, furnished, and animated for video in Blender 5.2 LTS, Cycles + OptiX.
 - Goal set by the user: **realistic and natural**. They rejected hidden "wash" lights as unnatural. They accepted visible linear pendant lights.
-- Current file: `WOOD-GALLERY_v10_video.blend`. Still renders: 1920x1080. Video: 1280x720 @ 60 fps, 1800 frames (30 s). **The full video render has NOT started yet.** Only a 120-frame test clip (frames 421-540) was rendered.
+- Current file: `blend\WOOD-GALLERY_v10_video.blend`. Still renders: 1920x1080. Video: 1280x720 @ 60 fps, 1800 frames (30 s). **The full video render has NOT started yet.** Only a 120-frame test clip (frames 421-540) was rendered.
 
 ## 1. Paths and files
-Root: `C:\Users\fx506\Pictures\Woo-Gallery\`
+Root: `C:\Users\fx506\Pictures\Woo-Gallery\`. This gallery lives in `galleries\hokkaido\` (paths below are relative to it unless they start with `archive\`). Config: `gallery.json`; web pipeline: `..\..\WEB_GALLERY.md`.
 
 | Path | Content |
 |---|---|
-| `WOOD-GALLERY.glb` | Original source model (do not modify) |
-| `WOOD-GALLERY_v01..v10_video.blend` | Version history. v08 contains the rejected wash lights. v09 = pendant lights, still-ready. v10_video = v09 + animation |
-| `assets\art\art_*.png` | 9 AI-generated paintings (originals, 1024x1024 with white wall edges) |
-| `assets\art\crop\art_*.png` | Cropped canvases used as textures (loaded into the .blend) |
-| `renders\cam_hero_hall.png`, `cam_entrance.png`, `cam_artwork_detail.png` | First final stills (dark version, 1920x1080, before pendant lights) |
+| `blend\WOOD-GALLERY.glb` | Original source model (do not modify) |
+| `blend\WOOD-GALLERY_v10_video.blend` | Current source scene (v09 = pendant lights, still-ready; v10_video = v09 + animation). Never touched by the web scripts |
+| `blend\WOOD-GALLERY_web.blend`, `blend\WOOD-GALLERY_empty.blend` | Derived by the web pipeline (full / without paintings). Do not edit by hand |
+| `archive\WOOD-GALLERY_v01..v09.blend` (repo root, git-ignored) | Version history. v08 contains the rejected wash lights. Also holds all `*.blend1` backups |
+| `art\art_*.png` | 9 AI-generated paintings (originals, 1024x1024 with white wall edges) |
+| `art\crop\art_*.png` | Cropped canvases used as textures. The .blend files reference them by relative path (`//../art/crop/<file>`) and the images are **not packed**: moving `art\` breaks the links |
+| `renders\cam_hero_hall.png`, `cam_entrance.png`, `cam_artwork_detail.png` | First final stills (dark version, 1920x1080, before pendant lights). `renders\` is git-ignored |
 | `renders\hero_hall_v09_small.png` | Latest preview (v09, 960x540, 64 spp) |
 | `renders\video_test\` | 4 test frames (1, 481, 901, 1300) |
 | `renders\video_clip_test\`, `renders\clip_test.mp4` | 2 s test clip, frames 421-540 |
@@ -94,7 +96,7 @@ Painting style: contemporary abstract oils. The palette (indigo, sienna, ochre, 
 | `smoke_detector` | (0, -2.5, 6.105) | detector_white | Entrance ceiling |
 
 ## 5. Materials (names after cleanup)
-Textures are packed in the .blend and prefixed `tex_`.
+Textures other than the paintings are packed in the .blend and prefixed `tex_`. The painting images (`art\crop\*.png`) are external, linked by relative path, not packed.
 - `wall_paint`: ivory (0.80, 0.78, 0.73), roughness 0.88, plaster bump (noise 180), dirt near the floor (position-Z mask x big noise), weak normal map 0.25.
 - `wood_laminate` (ceiling and trims): base color from `tex_wood_laminate_color`, roughness from luminance (0.75..0.45), bump, per-plank value variation, shader Bevel node (4 mm).
 - `wood_floor`: glTF ORM texture (green = roughness, blue -> metallic via Math), normal map, roughness multiplied by large noise (0.8..1.25), clearcoat 0.12, micro bump. The `glTF Material Output` node group is a harmless leftover.
